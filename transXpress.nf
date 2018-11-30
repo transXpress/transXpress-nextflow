@@ -24,7 +24,7 @@ TRINITY_PARAMS += " --trimmomatic --quality_trimming_params \"ILLUMINACLIP:${wor
 // Used for both trinity and kallisto jobs!
 STRAND_SPECIFIC = "" // --SS_lib_type=RF
 TRINITY_PARAMS += " --min_glue 2"
-TRINITY_PARAMS += " --min_kmer_cov 10"
+TRINITY_PARAMS += " --min_kmer_cov 2"
 TRINITY_PARAMS += " --no_normalize_reads"
 
 SIGNALP_ORGANISM = "euk"
