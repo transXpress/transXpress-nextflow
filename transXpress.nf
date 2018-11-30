@@ -95,23 +95,6 @@ process transdecoderLongOrfs {
     """
 }
 
-process transdecoderPredict {
-  publishDir ".", mode: "copy" // , saveAs: { filename -> "transcriptome_after_predict.pep" }
-  input:
-    file transdecoderWorkDir
-    file transcriptomeTransdecoderPredict
-    file blastpForTransdecoder
-    file pfamForTransdecoder
-  output:
-    file "${transcriptomeTransdecoderPredict}.transdecoder.pep" into proteomeAnnotation
-    file "${transcriptomeTransdecoderPredict}.transdecoder.*"
-  script:
-    """
-    TransDecoder.Predict -t ${transcriptomeTransdecoderPredict} --retain_pfam_hits ${pfamForTransdecoder} --retain_blastp_hits ${blastpForTransdecoder}
-    """
-}
-
-
 process kallisto {
   publishDir ".", mode: "copy"
   cpus 10
@@ -292,6 +275,22 @@ pfamResults.collectFile(name: 'pfam_annotations.txt').set { pfamResult }
 pfamDomResults.collectFile(name: 'pfam_dom_annotations.txt').into { pfamDomResult ; pfamForTransdecoder }
 signalpResults.collectFile(name: 'signalp_annotations.txt').set { signalpResult }
 tmhmmResults.collectFile(name: 'tmhmm_annotations.tsv').set { tmhmmResult }
+
+process transdecoderPredict {
+  publishDir ".", mode: "copy" // , saveAs: { filename -> "transcriptome_after_predict.pep" }
+  input:
+    file transdecoderWorkDir
+    file transcriptomeTransdecoderPredict
+    file blastpForTransdecoder
+    file pfamForTransdecoder
+  output:
+    file "${transcriptomeTransdecoderPredict}.transdecoder.pep" into proteomeAnnotation
+    file "${transcriptomeTransdecoderPredict}.transdecoder.*"
+  script:
+    """
+    TransDecoder.Predict -t ${transcriptomeTransdecoderPredict} --retain_pfam_hits ${pfamForTransdecoder} --retain_blastp_hits ${blastpForTransdecoder}
+    """
+}
 
 
 process annotatedFasta {
