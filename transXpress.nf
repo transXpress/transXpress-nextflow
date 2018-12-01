@@ -55,7 +55,7 @@ process trinityButterflyParallel {
 trinityFinishedCmds.collectFile(name: "recursive_trinity.cmds.completed").set { trinityAllFinishedCmds }
 
 process trinityFinish {
-  publishDir ".", mode: "copy", saveAs: { filename -> filename.replaceAll("trinity_out_dir/Trinity", "transcriptome") }
+  publishDir "transXpress_results", mode: "copy", saveAs: { filename -> filename.replaceAll("trinity_out_dir/Trinity", "transcriptome") }
   input:
     file "samples.txt" from file(params.samples)
     file trinityWorkDir
@@ -72,7 +72,7 @@ process trinityFinish {
 }
 
 process transdecoderLongOrfs {
-  publishDir ".", mode: "copy"
+  publishDir "transXpress_results", mode: "copy"
   input:
     file transcriptomeTransdecoder
   output:
@@ -85,7 +85,7 @@ process transdecoderLongOrfs {
 }
 
 process kallisto {
-  publishDir ".", mode: "copy"
+  publishDir "transXpress_results", mode: "copy"
   cpus 10
   input:
     file transcriptomeKallisto
@@ -115,7 +115,7 @@ normalizedKallistoTable
 
 
 process trinityStats {
-  publishDir ".", mode: "copy"
+  publishDir "transXpress_results", mode: "copy"
   cpus 1
   input:
     file transcriptomeStats
@@ -134,7 +134,7 @@ process trinityStats {
 }
 
 process transrate {
-  publishDir ".", mode: "copy", saveAs: { filename -> "transrate_results.csv" }
+  publishDir "transXpress_results", mode: "copy", saveAs: { filename -> "transrate_results.csv" }
   cpus 8
   input:
     file "samples.txt" from file(params.samples)
@@ -273,7 +273,7 @@ signalpResults.collectFile(name: 'signalp_annotations.txt').set { signalpResult 
 tmhmmResults.collectFile(name: 'tmhmm_annotations.tsv').set { tmhmmResult }
 
 process transdecoderPredict {
-  publishDir ".", mode: "copy" // , saveAs: { filename -> "transcriptome_after_predict.pep" }
+  publishDir "transXpress_results", mode: "copy" // , saveAs: { filename -> "transcriptome_after_predict.pep" }
   input:
     file transdecoderWorkDir
     file transcriptomeTransdecoderPredict
@@ -290,7 +290,7 @@ process transdecoderPredict {
 
 
 process annotatedFasta {
-  publishDir ".", mode: "copy"
+  publishDir "transXpress_results", mode: "copy"
   input:
     file transcriptomeFile from transcriptomeAnnotation
     file proteomeFile from proteomeAnnotation
@@ -303,8 +303,8 @@ process annotatedFasta {
     file signalpResult
     file tmhmmResult 
   output:
-    file "transcriptome_annotated.fasta"
-    file "transcriptome_annotated.pep"
+    file "transcriptome_annotated.fasta" into transcriptome_annotated_fasta_ch
+    file "transcriptome_annotated.pep" into transcriptome_annotated_pep_ch
     file "transcriptome_TPM_blast.csv"
     file "${blastxResult}"
     file "${blastpResult}"
@@ -440,5 +440,19 @@ process annotatedFasta {
     """
 }
 
-
+process final_checksum {
+    publishDir "transXpress_results", mode: "copy"
+    input:
+        file "transcriptome_annotated.fasta" from transcriptome_annotated_fasta_ch
+        file "transcriptome_annotated.pep" from transcriptome_annotated_pep_ch
+    output:
+        file "assembly_seq-dependent_checksums.txt"
+    script:
+    """
+    echo -n "transcriptome_annotated.fasta:" > assembly_seq-dependent_checksums.txt
+    seqkit sort -s transcriptome_annotated.fasta | grep -v ">" | md5sum | cut -f 1 -d ' '>> assembly_seq-dependent_checksums.txt
+    echo -n "transcriptome_annotated.pep:" >> assembly_seq-dependent_checksums.txt
+    seqkit sort -s transcriptome_annotated.pep | grep -v ">" | md5sum | cut -f 1 -d ' '>> assembly_seq-dependent_checksums.txt
+    """    
+}
 

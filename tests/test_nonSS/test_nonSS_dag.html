@@ -141,6 +141,7 @@ nodes: [
 { data: { id: 'p33', label: 'collectFile'}, classes: 'OPERATOR' },
 { data: { id: 'p34', label: 'transdecoderPredict'}, classes: 'PROCESS' },
 { data: { id: 'p35', label: 'annotatedFasta'}, classes: 'PROCESS' },
+{ data: { id: 'p36', label: 'final_checksum'}, classes: 'PROCESS' },
 ],
 edges: [
 { data: { source: 'p0', target: 'p1', label: 'samples.txt' } },
@@ -195,6 +196,8 @@ edges: [
 { data: { source: 'p32', target: 'p35', label: 'signalpResult' } },
 { data: { source: 'p33', target: 'p35', label: 'tmhmmResult' } },
 { data: { source: 'p34', target: 'p35', label: 'proteomeAnnotation' } },
+{ data: { source: 'p35', target: 'p36', label: 'transcriptome_annotated_fasta_ch' } },
+{ data: { source: 'p35', target: 'p36', label: 'transcriptome_annotated_pep_ch' } },
 ],
 },
 
