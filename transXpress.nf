@@ -193,6 +193,7 @@ proteomeSplit
 
 
 process downloadPfam {
+  executor 'local'
   storeDir 'db'
   output:
     set file("Pfam-A.hmm"), file("Pfam-A.hmm.h??") into pfamDb
@@ -205,6 +206,7 @@ process downloadPfam {
 }
 
 process downloadSprot {
+  executor 'local'
   storeDir 'db'
   output:
     set file("uniprot_sprot.fasta"), file("uniprot_sprot.fasta.p??") into sprotDb
