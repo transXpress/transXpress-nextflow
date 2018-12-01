@@ -7,35 +7,24 @@
  */
 
 
-params.samples = "samples.txt"
-samplesFile = file(params.samples)
-
+params.TRINITY_PARAMS += " --trimmomatic --quality_trimming_params \"ILLUMINACLIP:${workflow.projectDir}/adapters.fasta:3:30:10 SLIDINGWINDOW:4:20 LEADING:20 TRAILING:20 MINLEN:25\""
 
 log.info """
  transXpress
  ===================================
- Input samples file: ${params.samples}
  """
 
-
-TRINITY_PARAMS = " --seqType fq"
-TRINITY_PARAMS += " --trimmomatic --quality_trimming_params \"ILLUMINACLIP:${workflow.projectDir}/adapters.fasta:3:30:10 SLIDINGWINDOW:4:20 LEADING:20 TRAILING:20 MINLEN:25\""
-
-// Used for both trinity and kallisto jobs!
-STRAND_SPECIFIC = "" // --SS_lib_type=RF
-TRINITY_PARAMS += " --min_glue 2"
-TRINITY_PARAMS += " --min_kmer_cov 2"
-TRINITY_PARAMS += " --no_normalize_reads"
-
-SIGNALP_ORGANISM = "euk"
-
+params.SIGNALP_ORGANISMS = "euk"
 
 /*
  * Step 1. 
  */
 process trinityInchwormChrysalis {
+
+  stageInMode="copy" 
+ 
   input:
-    file samplesFile
+    file "samples.txt" from file(params.samples)
   output:
     file "trinity_out_dir" into trinityWorkDir
     file "trinity_out_dir/recursive_trinity.cmds" into trinityCmds
@@ -43,7 +32,7 @@ process trinityInchwormChrysalis {
   memory "200 GB"
   script:
     """
-    Trinity --no_distributed_trinity_exec --max_memory ${task.memory.toGiga()}G --CPU ${task.cpus} --samples_file ${samplesFile} ${TRINITY_PARAMS}
+    Trinity --no_distributed_trinity_exec --max_memory ${task.memory.toGiga()}G --CPU ${task.cpus} --samples_file ${"samples.txt"} ${params.TRINITY_PARAMS}
     """
 }
 
@@ -68,7 +57,7 @@ trinityFinishedCmds.collectFile(name: "recursive_trinity.cmds.completed").set { 
 process trinityFinish {
   publishDir ".", mode: "copy", saveAs: { filename -> filename.replaceAll("trinity_out_dir/Trinity", "transcriptome") }
   input:
-    file samplesFile
+    file "samples.txt" from file(params.samples)
     file trinityWorkDir
     file finishedCommands from trinityAllFinishedCmds
   output:
@@ -78,7 +67,7 @@ process trinityFinish {
   script:
     """
     cp ${finishedCommands} ${trinityWorkDir}/recursive_trinity.cmds.completed
-    Trinity --samples_file ${samplesFile} --max_memory ${task.memory.toGiga()}G ${TRINITY_PARAMS}
+    Trinity --samples_file ${"samples.txt"} --max_memory ${task.memory.toGiga()}G ${params.TRINITY_PARAMS}
     """ 
 }
 
@@ -101,7 +90,7 @@ process kallisto {
   input:
     file transcriptomeKallisto
     file geneTransMap
-    file samplesFile
+    file "samples.txt" from file(params.samples)
   output:
     file "kallisto.isoform.TPM.not_cross_norm" into rawKallistoTable
     file "kallisto.isoform.TMM.EXPR.matrix" optional true into normalizedKallistoTable
@@ -111,7 +100,7 @@ process kallisto {
     """
     export TRINITY_HOME=\$(dirname `which Trinity`)
     echo TRINITY_HOME set to \${TRINITY_HOME}
-    \${TRINITY_HOME}/util/align_and_estimate_abundance.pl --transcripts ${transcriptomeKallisto} ${STRAND_SPECIFIC} --seqType fq --samples_file ${samplesFile} --prep_reference --thread_count ${task.cpus} --est_method kallisto --gene_trans_map ${geneTransMap}
+    \${TRINITY_HOME}/util/align_and_estimate_abundance.pl --transcripts ${transcriptomeKallisto} ${params.STRAND_SPECIFIC} --seqType fq --samples_file ${"samples.txt"} --prep_reference --thread_count ${task.cpus} --est_method kallisto --gene_trans_map ${geneTransMap}
     \${TRINITY_HOME}/util/abundance_estimates_to_matrix.pl --est_method kallisto --name_sample_by_basedir --gene_trans_map $geneTransMap */abundance.tsv
     """
 }
@@ -148,15 +137,22 @@ process transrate {
   publishDir ".", mode: "copy", saveAs: { filename -> "transrate_results.csv" }
   cpus 8
   input:
-    file samplesFile 
+    file "samples.txt" from file(params.samples)
     file transcriptomeTransrate 
   output:
     file "transrate_results/Trinity/contigs.csv" into transrateResults
+
+/// This strips out the odd read naming from SRA, that screws up transrate
+/// seqkit replace -p '_forward/1' -r '' \$LEFT | gzip > F_reads.fq.gz
+/// seqkit replace -p '_reverse/2' -r '' \$RIGHT | gzip > R_reads.fq.gz
+
   script:
     """
-    LEFT=`cut -f 3 < ${samplesFile} | tr '\n' ',' | sed 's/,*\$//g'`
-    RIGHT=`cut -f 4 < ${samplesFile} | tr '\n' ',' | sed 's/,*\$//g'`
-    transrate --threads ${task.cpus} --assembly=${transcriptomeTransrate} --left=\$LEFT --right=\$RIGHT
+    LEFT=`cut -f 3 < ${"samples.txt"} | tr '\n' ',' | sed 's/,*\$//g'`
+    RIGHT=`cut -f 4 < ${"samples.txt"} | tr '\n' ',' | sed 's/,*\$//g'`
+    seqkit replace -p '_forward/1' -r '' \$LEFT | gzip > F_reads.fq.gz
+    seqkit replace -p '_reverse/2' -r '' \$RIGHT | gzip > R_reads.fq.gz
+    transrate --threads ${task.cpus} --assembly=${transcriptomeTransrate} --left=F_reads.fq.gz --right=R_reads.fq.gz
     """
 }
 
@@ -250,7 +246,7 @@ process signalpParallel {
   script:
     """
     echo signalp ${chunk}
-    signalp -t ${SIGNALP_ORGANISM} -f short ${chunk} > signalp_out
+    signalp -t ${params.SIGNALP_ORGANISMS} -f short ${chunk} > signalp_out
     """
 }
 
