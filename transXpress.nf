@@ -35,10 +35,6 @@ process trinityInchwormChrysalis {
   cpus 12
   memory "200 GB"
 
-  test_nonSS {
-        memory = '4 GB'
-    }
- 
   input:
     file "samples.txt" from file(params.samples)
     file "species.txt" from file(params.species)
