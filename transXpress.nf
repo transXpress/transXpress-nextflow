@@ -28,7 +28,16 @@ params.SIGNALP_ORGANISMS = "euk"
  */
 process trinityInchwormChrysalis {
 
+  echo = true
+  label = "nf_"+assemblyPrefix+"_trinityInchwormChrysalis"
   stageInMode="copy" 
+
+  cpus 12
+  memory "200 GB"
+
+  test_nonSS {
+        memory = '4 GB'
+    }
  
   input:
     file "samples.txt" from file(params.samples)
@@ -36,8 +45,7 @@ process trinityInchwormChrysalis {
   output:
     file "trinity_out_dir" into trinityWorkDir
     file "trinity_out_dir/recursive_trinity.cmds" into trinityCmds
-  cpus 12
-  memory "200 GB"
+
   script:
     """
     Trinity --no_distributed_trinity_exec --max_memory ${task.memory.toGiga()}G --CPU ${task.cpus} --samples_file ${"samples.txt"} ${params.TRINITY_PARAMS}
@@ -47,6 +55,7 @@ process trinityInchwormChrysalis {
 trinityCmds.splitText(by: 10, file: "trinityCmd").set { trinityParallelCmds }
 
 process trinityButterflyParallel {
+  label = "nf_"+assemblyPrefix+"_trinityButterflyParallel"
   input:
   //  file trinityWorkDir
     file parallelCommand from trinityParallelCmds
