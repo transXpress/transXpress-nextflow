@@ -35,6 +35,10 @@ process trinityInchwormChrysalis {
   cpus 12
   memory "200 GB"
 
+  tag { assemblyPrefix }
+
+  afterScript 'echo \"(Above completion message is from Trinity. transXpress will continue the pipeline execution.)\"'
+
   input:
     file "samples.txt" from file(params.samples)
     file "species.txt" from file(params.species)
@@ -51,13 +55,12 @@ process trinityInchwormChrysalis {
 trinityCmds.splitText(by: 10, file: "trinityCmd").set { trinityParallelCmds }
 
 process trinityButterflyParallel {
-  label = "nf_"+assemblyPrefix+"_trinityButterflyParallel"
   input:
   //  file trinityWorkDir
     file parallelCommand from trinityParallelCmds
   output:
     file "${parallelCommand}.completed" into trinityFinishedCmds
-  tag { parallelCommand }
+  tag { assemblyPrefix+"-"+parallelCommand }
   script:
     """
     sh ${parallelCommand}
@@ -228,7 +231,7 @@ process sprotBlastxParallel {
     set sprotDb, sprotDbIndex from sprotDb
   output:
     file "blastx_out" into sprotBlastxResults
-  tag { chunk }
+  tag { assemblyPrefix+"-"+chunk }
   script:
     """
     echo blastx ${chunk} using database ${sprotDb}
@@ -243,7 +246,7 @@ process sprotBlastpParallel {
     set sprotDb, sprotDbIndex from sprotDb
   output:
     file "blastp_out" into sprotBlastpResults
-  tag { chunk }
+  tag { assemblyPrefix+"-"+chunk }
   script:
     """
     echo blastp ${chunk} using database ${sprotDb}
@@ -261,7 +264,7 @@ process pfamParallel {
   output:
     file "pfam_out" into pfamResults
     file "pfam_dom_out" into pfamDomResults
-  tag { chunk }
+  tag { assemblyPrefix+"-"+chunk }
   script:
     """
     echo pfam ${chunk} using database ${pfamDb}
@@ -297,7 +300,7 @@ process signalpParallel {
     file chunk from signalpChunks
   output:
     file "signalp_out" into signalpResults
-  tag { chunk }
+  tag { assemblyPrefix+"-"+chunk }
   script:
     """
     echo signalp ${chunk}
@@ -312,7 +315,7 @@ process tmhmmParallel {
     file chunk from tmhmmChunks
   output:
     file "tmhmm_out" into tmhmmResults
-  tag { chunk }
+  tag { assemblyPrefix+"-"+chunk }
   script:
     """
     echo tmhmm ${chunk}
