@@ -108,7 +108,7 @@ process transdecoderLongOrfs {
   input:
     file transcriptomeTransdecoder
   output:
-    file "${transcriptomeTransdecoder}.transdecoder_dir/longest_orfs.pep" into proteomeSplit
+    file "${transcriptomeTransdecoder}.transdecoder_dir/longest_orfs.pep" into longOrfsProteomeSplit
     file "${transcriptomeTransdecoder}.transdecoder_dir" into transdecoderWorkDir
   script:
     """
@@ -144,7 +144,6 @@ normalizedKallistoTable
     .concat( rawKallistoTable )
     .first()
     .into { transcriptExpression; expressionStats }
-
 
 process trinityStats {
   publishDir "transXpress_results", mode: "copy"
@@ -192,10 +191,9 @@ transcriptomeSplit
   .splitFasta(by: 100, file: true)
   .set { sprotBlastxChunks }
 
-proteomeSplit
+longOrfsProteomeSplit
   .splitFasta(by: 100, file: true)
-  .into { sprotBlastpChunks; pfamChunks; signalpChunks; tmhmmChunks }
-
+  .into { sprotBlastpChunks; pfamChunks }
 
 process downloadPfam {
   executor 'local'
@@ -252,6 +250,8 @@ process sprotBlastpParallel {
     blastp -query ${chunk} -db ${sprotDb} -num_threads ${task.cpus} -evalue 1e-6 -max_hsps 1 -max_target_seqs 1 -outfmt "6 std stitle" -out blastp_out
     """
 }
+sprotBlastxResults.collectFile(name: 'blastx_annotations.tsv').set { blastxResult }
+sprotBlastpResults.collectFile(name: 'blastp_annotations.tsv').into { blastpForTransdecoder; blastpResult }
 
 process pfamParallel {
   cpus 2
@@ -268,6 +268,28 @@ process pfamParallel {
     hmmscan --cpu ${task.cpus} --domtblout pfam_dom_out --tblout pfam_out ${pfamDb} ${chunk}
     """
 }
+pfamResults.collectFile(name: 'pfam_annotations.txt').set { pfamResult }
+pfamDomResults.collectFile(name: 'pfam_dom_annotations.txt').into { pfamDomResult ; pfamForTransdecoder }
+
+process transdecoderPredict {
+  publishDir "transXpress_results", mode: "copy" // , saveAs: { filename -> "transcriptome_after_predict.pep" }
+  input:
+    file transdecoderWorkDir
+    file transcriptomeTransdecoderPredict
+    file blastpForTransdecoder
+    file pfamForTransdecoder
+  output:
+    file "${transcriptomeTransdecoderPredict}.transdecoder.pep" into predictProteome, predictProteomeSplit //This seems a bit weird. Referring to it indirectly, rather than directly
+    file "${transcriptomeTransdecoderPredict}.transdecoder.*"
+  script:
+    """
+    TransDecoder.Predict -t ${transcriptomeTransdecoderPredict} --retain_pfam_hits ${pfamForTransdecoder} --retain_blastp_hits ${blastpForTransdecoder}
+    """
+}
+
+predictProteomeSplit
+  .splitFasta(by: 100, file: true)
+  .into { signalpChunks; tmhmmChunks }
 
 process signalpParallel {
   cpus 1
@@ -282,6 +304,7 @@ process signalpParallel {
     signalp -t ${params.SIGNALP_ORGANISMS} -f short ${chunk} > signalp_out
     """
 }
+signalpResults.collectFile(name: 'signalp_annotations.txt').set { signalpResult }
 
 process tmhmmParallel {
   cpus 1
@@ -296,37 +319,14 @@ process tmhmmParallel {
     tmhmm --short < ${chunk} > tmhmm_out
     """
 }
-
-// Collect parallelized annotations
-sprotBlastxResults.collectFile(name: 'blastx_annotations.tsv').set { blastxResult }
-sprotBlastpResults.collectFile(name: 'blastp_annotations.tsv').into { blastpForTransdecoder; blastpResult }
-pfamResults.collectFile(name: 'pfam_annotations.txt').set { pfamResult }
-pfamDomResults.collectFile(name: 'pfam_dom_annotations.txt').into { pfamDomResult ; pfamForTransdecoder }
-signalpResults.collectFile(name: 'signalp_annotations.txt').set { signalpResult }
 tmhmmResults.collectFile(name: 'tmhmm_annotations.tsv').set { tmhmmResult }
 
-process transdecoderPredict {
-  publishDir "transXpress_results", mode: "copy" // , saveAs: { filename -> "transcriptome_after_predict.pep" }
-  input:
-    file transdecoderWorkDir
-    file transcriptomeTransdecoderPredict
-    file blastpForTransdecoder
-    file pfamForTransdecoder
-  output:
-    file "${transcriptomeTransdecoderPredict}.transdecoder.pep" into proteomeAnnotation
-    file "${transcriptomeTransdecoderPredict}.transdecoder.*"
-  script:
-    """
-    TransDecoder.Predict -t ${transcriptomeTransdecoderPredict} --retain_pfam_hits ${pfamForTransdecoder} --retain_blastp_hits ${blastpForTransdecoder}
-    """
-}
-
-
+// Collect parallelized annotations
 process annotatedFasta {
   publishDir "transXpress_results", mode: "copy"
   input:
     file transcriptomeFile from transcriptomeAnnotation
-    file proteomeFile from proteomeAnnotation
+    file proteomeFile from predictProteome
     file transrateFile from transrateResults
     file kallistoFile from transcriptExpression
     file blastxResult 
