@@ -19,7 +19,7 @@ assemblyPrefix = theDate+"_"+genus+"_"+species+"_Trinity"
 log.info """
  transXpress
  ===================================
- """
+ """+assemblyPrefix
 
 params.SIGNALP_ORGANISMS = "euk"
 
