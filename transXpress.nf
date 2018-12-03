@@ -7,49 +7,51 @@
  */
 
 
-params.samples = "samples.txt"
-samplesFile = file(params.samples)
+params.TRINITY_PARAMS += " --trimmomatic --quality_trimming_params \"ILLUMINACLIP:${workflow.projectDir}/adapters.fasta:3:30:10 SLIDINGWINDOW:4:20 LEADING:20 TRAILING:20 MINLEN:25\""
 
+theDate = new java.util.Date().format( 'MMdd' )
+
+theText = file(params.species).text
+genus = theText.split(" ")[0]
+species = theText.split(" ")[1].trim()
+assemblyPrefix = theDate+"_"+genus+"_"+species+"_Trinity"
 
 log.info """
  transXpress
  ===================================
- Input samples file: ${params.samples}
  """
 
-
-TRINITY_PARAMS = " --seqType fq"
-TRINITY_PARAMS += " --trimmomatic --quality_trimming_params \"ILLUMINACLIP:${workflow.projectDir}/adapters.fasta:3:30:10 SLIDINGWINDOW:4:20 LEADING:20 TRAILING:20 MINLEN:25\""
-
-// Used for both trinity and kallisto jobs!
-STRAND_SPECIFIC = "" // --SS_lib_type=RF
-TRINITY_PARAMS += " --min_glue 2"
-TRINITY_PARAMS += " --min_kmer_cov 2"
-TRINITY_PARAMS += " --no_normalize_reads"
-
-SIGNALP_ORGANISM = "euk"
-
+params.SIGNALP_ORGANISMS = "euk"
 
 /*
  * Step 1. 
  */
 process trinityInchwormChrysalis {
+
+  echo = true
+  label = "nf_"+assemblyPrefix+"_trinityInchwormChrysalis"
+  stageInMode="copy" 
+
+  cpus 12
+  memory "200 GB"
+
   input:
-    file samplesFile
+    file "samples.txt" from file(params.samples)
+    file "species.txt" from file(params.species)
   output:
     file "trinity_out_dir" into trinityWorkDir
     file "trinity_out_dir/recursive_trinity.cmds" into trinityCmds
-  cpus 12
-  memory "200 GB"
+
   script:
     """
-    Trinity --no_distributed_trinity_exec --max_memory ${task.memory.toGiga()}G --CPU ${task.cpus} --samples_file ${samplesFile} ${TRINITY_PARAMS}
+    Trinity --no_distributed_trinity_exec --max_memory ${task.memory.toGiga()}G --CPU ${task.cpus} --samples_file ${"samples.txt"} ${params.TRINITY_PARAMS}
     """
 }
 
 trinityCmds.splitText(by: 10, file: "trinityCmd").set { trinityParallelCmds }
 
 process trinityButterflyParallel {
+  label = "nf_"+assemblyPrefix+"_trinityButterflyParallel"
   input:
   //  file trinityWorkDir
     file parallelCommand from trinityParallelCmds
@@ -66,24 +68,43 @@ process trinityButterflyParallel {
 trinityFinishedCmds.collectFile(name: "recursive_trinity.cmds.completed").set { trinityAllFinishedCmds }
 
 process trinityFinish {
-  publishDir ".", mode: "copy", saveAs: { filename -> filename.replaceAll("trinity_out_dir/Trinity", "transcriptome") }
+   publishDir "transXpress_results", mode: "copy", saveAs: { filename -> filename.replaceAll("trinity_out_dir/Trinity", "transcriptome") }
   input:
-    file samplesFile
+    file "samples.txt" from file(params.samples)
     file trinityWorkDir
     file finishedCommands from trinityAllFinishedCmds
   output:
-    file "trinity_out_dir/Trinity.fasta" into transcriptomeKallisto, transcriptomeTransdecoder, transcriptomeTransdecoderPredict, transcriptomeStats, transcriptomeTransrate, transcriptomeSplit, transcriptomeAnnotation
-    file "trinity_out_dir/Trinity.fasta.gene_trans_map" into geneTransMap
+    file "trinity_out_dir/Trinity.fasta" into Trinity_fasta_ch
+    file "trinity_out_dir/recursive_trinity.cmds.completed"
   memory "1 GB"
   script:
     """
     cp ${finishedCommands} ${trinityWorkDir}/recursive_trinity.cmds.completed
-    Trinity --samples_file ${samplesFile} --max_memory ${task.memory.toGiga()}G ${TRINITY_PARAMS}
+    Trinity --samples_file ${"samples.txt"} --max_memory ${task.memory.toGiga()}G ${params.TRINITY_PARAMS}
     """ 
 }
 
+process renameTrinityAssembly {
+   publishDir "transXpress_results", mode: "copy", saveAs: { filename -> filename.replaceAll("trinity_out_dir/Trinity", "transcriptome") }
+
+   input: 
+    file trinityWorkDir
+    file "Trinity.fasta" from Trinity_fasta_ch
+    file "species.txt" from file(params.species) //Just a dummy input
+    
+   output:
+    file assemblyPrefix+".fasta" into transcriptomeKallisto, transcriptomeTransdecoder, transcriptomeTransdecoderPredict, transcriptomeStats, transcriptomeTransrate, transcriptomeSplit, transcriptomeAnnotation
+    file "trinity_out_dir/Trinity_renamed.fasta.gene_trans_map" into geneTransMap
+
+   script:
+   """
+   seqkit replace -p '^TRINITY' -r '${assemblyPrefix}' Trinity.fasta > ${assemblyPrefix}.fasta 
+   cat trinity_out_dir/Trinity.fasta.gene_trans_map | sed 's/^TRINITY/${assemblyPrefix}/' | sed 's/\tTRINITY/\t${assemblyPrefix}/g' > trinity_out_dir/Trinity_renamed.fasta.gene_trans_map
+   """
+}
+
 process transdecoderLongOrfs {
-  publishDir ".", mode: "copy"
+  publishDir "transXpress_results", mode: "copy"
   input:
     file transcriptomeTransdecoder
   output:
@@ -96,12 +117,12 @@ process transdecoderLongOrfs {
 }
 
 process kallisto {
-  publishDir ".", mode: "copy"
+  publishDir "transXpress_results", mode: "copy"
   cpus 10
   input:
     file transcriptomeKallisto
     file geneTransMap
-    file samplesFile
+    file "samples.txt" from file(params.samples)
   output:
     file "kallisto.isoform.TPM.not_cross_norm" into rawKallistoTable
     file "kallisto.isoform.TMM.EXPR.matrix" optional true into normalizedKallistoTable
@@ -111,7 +132,7 @@ process kallisto {
     """
     export TRINITY_HOME=\$(dirname `which Trinity`)
     echo TRINITY_HOME set to \${TRINITY_HOME}
-    \${TRINITY_HOME}/util/align_and_estimate_abundance.pl --transcripts ${transcriptomeKallisto} ${STRAND_SPECIFIC} --seqType fq --samples_file ${samplesFile} --prep_reference --thread_count ${task.cpus} --est_method kallisto --gene_trans_map ${geneTransMap}
+    \${TRINITY_HOME}/util/align_and_estimate_abundance.pl --transcripts ${transcriptomeKallisto} ${params.STRAND_SPECIFIC} --seqType fq --samples_file ${"samples.txt"} --prep_reference --thread_count ${task.cpus} --est_method kallisto --gene_trans_map ${geneTransMap}
     \${TRINITY_HOME}/util/abundance_estimates_to_matrix.pl --est_method kallisto --name_sample_by_basedir --gene_trans_map $geneTransMap */abundance.tsv
     """
 }
@@ -126,7 +147,7 @@ normalizedKallistoTable
 
 
 process trinityStats {
-  publishDir ".", mode: "copy"
+  publishDir "transXpress_results", mode: "copy"
   cpus 1
   input:
     file transcriptomeStats
@@ -145,18 +166,25 @@ process trinityStats {
 }
 
 process transrate {
-  publishDir ".", mode: "copy", saveAs: { filename -> "transrate_results.csv" }
+  publishDir "transXpress_results", mode: "copy", saveAs: { filename -> "transrate_results.csv" }
   cpus 8
   input:
-    file samplesFile 
+    file "samples.txt" from file(params.samples)
     file transcriptomeTransrate 
   output:
-    file "transrate_results/Trinity/contigs.csv" into transrateResults
+    file "transrate_results/"+assemblyPrefix+"/contigs.csv" into transrateResults
+
+/// This strips out the odd read naming from SRA, that screws up transrate
+/// seqkit replace -p '_forward/1' -r '' \$LEFT | gzip > F_reads.fq.gz
+/// seqkit replace -p '_reverse/2' -r '' \$RIGHT | gzip > R_reads.fq.gz
+
   script:
     """
-    LEFT=`cut -f 3 < ${samplesFile} | tr '\n' ',' | sed 's/,*\$//g'`
-    RIGHT=`cut -f 4 < ${samplesFile} | tr '\n' ',' | sed 's/,*\$//g'`
-    transrate --threads ${task.cpus} --assembly=${transcriptomeTransrate} --left=\$LEFT --right=\$RIGHT
+    LEFT=`cut -f 3 < ${"samples.txt"} | tr '\n' ',' | sed 's/,*\$//g'`
+    RIGHT=`cut -f 4 < ${"samples.txt"} | tr '\n' ',' | sed 's/,*\$//g'`
+    seqkit replace -p '_forward/1' -r '' \$LEFT | gzip > F_reads.fq.gz
+    seqkit replace -p '_reverse/2' -r '' \$RIGHT | gzip > R_reads.fq.gz
+    transrate --threads ${task.cpus} --assembly=${transcriptomeTransrate} --left=F_reads.fq.gz --right=R_reads.fq.gz
     """
 }
 
@@ -170,6 +198,7 @@ proteomeSplit
 
 
 process downloadPfam {
+  executor 'local'
   storeDir 'db'
   output:
     set file("Pfam-A.hmm"), file("Pfam-A.hmm.h??") into pfamDb
@@ -182,6 +211,7 @@ process downloadPfam {
 }
 
 process downloadSprot {
+  executor 'local'
   storeDir 'db'
   output:
     set file("uniprot_sprot.fasta"), file("uniprot_sprot.fasta.p??") into sprotDb
@@ -192,7 +222,6 @@ process downloadSprot {
     makeblastdb -in uniprot_sprot.fasta -dbtype prot
     """
 }
-
 
 process sprotBlastxParallel {
   cpus 2
@@ -250,7 +279,7 @@ process signalpParallel {
   script:
     """
     echo signalp ${chunk}
-    signalp -t ${SIGNALP_ORGANISM} -f short ${chunk} > signalp_out
+    signalp -t ${params.SIGNALP_ORGANISMS} -f short ${chunk} > signalp_out
     """
 }
 
@@ -277,7 +306,7 @@ signalpResults.collectFile(name: 'signalp_annotations.txt').set { signalpResult 
 tmhmmResults.collectFile(name: 'tmhmm_annotations.tsv').set { tmhmmResult }
 
 process transdecoderPredict {
-  publishDir ".", mode: "copy" // , saveAs: { filename -> "transcriptome_after_predict.pep" }
+  publishDir "transXpress_results", mode: "copy" // , saveAs: { filename -> "transcriptome_after_predict.pep" }
   input:
     file transdecoderWorkDir
     file transcriptomeTransdecoderPredict
@@ -294,7 +323,7 @@ process transdecoderPredict {
 
 
 process annotatedFasta {
-  publishDir ".", mode: "copy"
+  publishDir "transXpress_results", mode: "copy"
   input:
     file transcriptomeFile from transcriptomeAnnotation
     file proteomeFile from proteomeAnnotation
@@ -307,8 +336,8 @@ process annotatedFasta {
     file signalpResult
     file tmhmmResult 
   output:
-    file "transcriptome_annotated.fasta"
-    file "transcriptome_annotated.pep"
+    file assemblyPrefix+"_annotated.fasta" into transcriptome_annotated_fasta_ch
+    file assemblyPrefix+"_annotated.pep" into transcriptome_annotated_pep_ch
     file "transcriptome_TPM_blast.csv"
     file "${blastxResult}"
     file "${blastpResult}"
@@ -396,7 +425,7 @@ process annotatedFasta {
     
     ## Do the work
     print ("Annotating FASTA file ${transcriptomeFile}")
-    with open("${transcriptomeFile}", 'r') as input_fasta_handle, open("transcriptome_annotated.fasta", 'w') as output_fasta_handle:
+    with open("${transcriptomeFile}", 'r') as input_fasta_handle, open("${assemblyPrefix}_annotated.fasta", 'w') as output_fasta_handle:
       for record in Bio.SeqIO.parse(input_fasta_handle, "fasta"):
         transcript_id = record.id
         record.description = "TPM: " + expression_annotations.get(transcript_id)
@@ -407,7 +436,7 @@ process annotatedFasta {
         Bio.SeqIO.write(record, output_fasta_handle, "fasta")
     
     print ("Annotating FASTA file ${proteomeFile}")
-    with open("${proteomeFile}", 'r') as input_fasta_handle, open("transcriptome_annotated.pep", 'w') as output_fasta_handle:
+    with open("${proteomeFile}", 'r') as input_fasta_handle, open("${assemblyPrefix}_annotated.pep", 'w') as output_fasta_handle:
       for record in Bio.SeqIO.parse(input_fasta_handle, "fasta"):
         transcript_id = re.sub("\\.p[0-9]+\$", "", record.id)
         record.description = "transdecoder " + re.search("ORF type:[^,]+,score=[^,]+", record.description).group(0)
@@ -444,5 +473,19 @@ process annotatedFasta {
     """
 }
 
-
+process final_checksum {
+    publishDir "transXpress_results", mode: "copy"
+    input:
+        file "transcriptome_annotated.fasta" from transcriptome_annotated_fasta_ch
+        file "transcriptome_annotated.pep" from transcriptome_annotated_pep_ch
+    output:
+        file "assembly_seq-dependent_checksums.txt"
+    script:
+    """
+    echo -n "transcriptome_annotated.fasta:" > assembly_seq-dependent_checksums.txt
+    seqkit sort -s transcriptome_annotated.fasta | grep -v ">" | md5sum | cut -f 1 -d ' '>> assembly_seq-dependent_checksums.txt
+    echo -n "transcriptome_annotated.pep:" >> assembly_seq-dependent_checksums.txt
+    seqkit sort -s transcriptome_annotated.pep | grep -v ">" | md5sum | cut -f 1 -d ' '>> assembly_seq-dependent_checksums.txt
+    """    
+}
 
