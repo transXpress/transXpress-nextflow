@@ -182,8 +182,8 @@ process transrate {
 
   script:
     """
-    LEFT=`cut -f 3 < ${"samples.txt"} | tr '\n' ',' | sed 's/,*\$//g'`
-    RIGHT=`cut -f 4 < ${"samples.txt"} | tr '\n' ',' | sed 's/,*\$//g'`
+    LEFT=`cut -f 3 < ${"samples.txt"} | tr '\n' ' ' | sed 's/ *\$//g'`
+    RIGHT=`cut -f 4 < ${"samples.txt"} | tr '\n' ' ' | sed 's/ *\$//g'`
     seqkit replace -p '_forward/1' -r '' \$LEFT | gzip > F_reads.fq.gz
     seqkit replace -p '_reverse/2' -r '' \$RIGHT | gzip > R_reads.fq.gz
     transrate --threads ${task.cpus} --assembly=${transcriptomeTransrate} --left=F_reads.fq.gz --right=R_reads.fq.gz
