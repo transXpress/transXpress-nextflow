@@ -1,2 +1,2 @@
-transcriptome_annotated.fasta:dfb2f0c40072d83a1dbc9ce032102006
-transcriptome_annotated.pep:d9fc721112c53b8d92db29fed12597bc
+transcriptome_annotated.fasta:e8c3a84a13944f24ba16918ddd9ed7e5
+transcriptome_annotated.pep:e90946f21731d49974665f1aff67e320

@@ -68,17 +68,29 @@ process trinityButterflyParallel {
     """ 
 }
 
-trinityFinishedCmds.collectFile(name: "recursive_trinity.cmds.completed").set { trinityAllFinishedCmds }
+process collectButterflyCmds {
+  cache 'deep'
+  input:
+    file butterflyCmds from trinityFinishedCmds.collectFile(name: "recursive_trinity.cmds.completed",sort: true)
+  output:
+    file "${butterflyCmds}" into trinityAllFinishedCmds    
+  script:
+  """
+  """
+}
 
 process trinityFinish {
    publishDir "transXpress_results", mode: "copy", saveAs: { filename -> filename.replaceAll("trinity_out_dir/Trinity", "transcriptome") }
+   cache 'deep'
   input:
     file "samples.txt" from file(params.samples)
     file trinityWorkDir
     file finishedCommands from trinityAllFinishedCmds
   output:
-    file "trinity_out_dir/Trinity.fasta" into Trinity_fasta_ch
-    file "trinity_out_dir/recursive_trinity.cmds.completed"
+    file "${trinityWorkDir}/Trinity.fasta.gene_trans_map" into originalGeneTransMap
+    file "${trinityWorkDir}/Trinity.fasta" into Trinity_fasta_ch
+    file "${trinityWorkDir}/recursive_trinity.cmds.completed"
+    file trinityWorkDir into trinityWorkDirFinal
   memory "1 GB"
   script:
     """
@@ -88,21 +100,20 @@ process trinityFinish {
 }
 
 process renameTrinityAssembly {
-   publishDir "transXpress_results", mode: "copy", saveAs: { filename -> filename.replaceAll("trinity_out_dir/Trinity", "transcriptome") }
+   publishDir "transXpress_results", mode: "copy"
 
    input: 
-    file trinityWorkDir
     file "Trinity.fasta" from Trinity_fasta_ch
     file "species.txt" from file(params.species) //Just a dummy input
-    
+    file "Trinity.fasta.gene_trans_map" from originalGeneTransMap
    output:
     file assemblyPrefix+".fasta" into transcriptomeKallisto, transcriptomeTransdecoder, transcriptomeTransdecoderPredict, transcriptomeStats, transcriptomeTransrate, transcriptomeSplit, transcriptomeAnnotation
-    file "trinity_out_dir/Trinity_renamed.fasta.gene_trans_map" into geneTransMap
+    file "Trinity_renamed.fasta.gene_trans_map" into geneTransMap
 
    script:
    """
    seqkit replace -p '^TRINITY' -r '${assemblyPrefix}' Trinity.fasta > ${assemblyPrefix}.fasta 
-   cat trinity_out_dir/Trinity.fasta.gene_trans_map | sed 's/^TRINITY/${assemblyPrefix}/' | sed 's/\tTRINITY/\t${assemblyPrefix}/g' > trinity_out_dir/Trinity_renamed.fasta.gene_trans_map
+   cat Trinity.fasta.gene_trans_map | sed 's/^TRINITY/${assemblyPrefix}/' | sed 's/\tTRINITY/\t${assemblyPrefix}/g' > Trinity_renamed.fasta.gene_trans_map
    """
 }
 
@@ -192,7 +203,7 @@ process transrate {
 
 transcriptomeSplit
   .splitFasta(by: 100, file: true)
-  .set { sprotBlastxChunks }
+  .into { sprotBlastxChunks; rfamChunks }
 
 longOrfsProteomeSplit
   .splitFasta(by: 100, file: true)
@@ -208,6 +219,19 @@ process downloadPfam {
     wget "ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.hmm.gz"
     gunzip Pfam-A.hmm.gz
     hmmpress Pfam-A.hmm
+    """
+}
+
+process downloadRfam {
+  executor 'local'
+  storeDir 'db'
+  output:
+    set file("Rfam_with_desc.cm"), file("Rfam_with_desc.cm.???") into rfamDb
+  script:
+    """
+    wget "ftp://ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/Rfam_with_desc.cm.gz"
+    gunzip Rfam_with_desc.cm.gz
+    cmpress Rfam_with_desc.cm
     """
 }
 
@@ -273,6 +297,24 @@ process pfamParallel {
 }
 pfamResults.collectFile(name: 'pfam_annotations.txt').set { pfamResult }
 pfamDomResults.collectFile(name: 'pfam_dom_annotations.txt').into { pfamDomResult ; pfamForTransdecoder }
+
+process rfamParallel {
+  cpus 2
+  input:
+    file chunk from rfamChunks
+    set rfamDb, rfamDbIndex from rfamDb
+  output:
+    file "rfam_out" into rfamResults
+    //file "rfam_dom_out" into rfamDomResults
+  tag { assemblyPrefix+"-"+chunk }
+  script:
+    """
+    echo rfam ${chunk} using database ${rfamDb}
+    cmscan --incE 0.00001 --rfam --cpu ${task.cpus} --tblout rfam_out ${rfamDb} ${chunk}
+    """
+}
+rfamResults.collectFile(name: 'rfam_annotations.txt').set { rfamResult }
+//rfamDomResults.collectFile(name: 'rfam_dom_annotations.txt').set { rfamDomResult }
 
 process transdecoderPredict {
   publishDir "transXpress_results", mode: "copy" // , saveAs: { filename -> "transcriptome_after_predict.pep" }
@@ -476,11 +518,14 @@ process annotatedFasta {
     """
 }
 
+transcriptome_annotated_fasta_ch.into { transcriptome_annotated_fasta_ch1 ; transcriptome_annotated_fasta_ch2 }
+transcriptome_annotated_pep_ch.into { transcriptome_annotated_pep_ch1 ; transcriptome_annotated_pep_ch2 }
+
 process final_checksum {
     publishDir "transXpress_results", mode: "copy"
     input:
-        file "transcriptome_annotated.fasta" from transcriptome_annotated_fasta_ch
-        file "transcriptome_annotated.pep" from transcriptome_annotated_pep_ch
+        file "transcriptome_annotated.fasta" from transcriptome_annotated_fasta_ch1
+        file "transcriptome_annotated.pep" from transcriptome_annotated_pep_ch1
     output:
         file "assembly_seq-dependent_checksums.txt"
     script:
@@ -490,5 +535,55 @@ process final_checksum {
     echo -n "transcriptome_annotated.pep:" >> assembly_seq-dependent_checksums.txt
     seqkit sort -s transcriptome_annotated.pep | grep -v ">" | md5sum | cut -f 1 -d ' '>> assembly_seq-dependent_checksums.txt
     """    
+}
+
+
+Channel.fromPath(["/lab/solexa_weng/Seq_data/Projects/Tim_Fallon/BUSCO_profiles/BUSCO_v2_profiles/bacteria_odb9/",\
+"/lab/solexa_weng/Seq_data/Projects/Tim_Fallon/BUSCO_profiles/BUSCO_v2_profiles/fungi_odb9/",\
+"/lab/solexa_weng/Seq_data/Projects/Tim_Fallon/BUSCO_profiles/BUSCO_v2_profiles/metazoa_odb9/",\
+"/lab/solexa_weng/Seq_data/Projects/Tim_Fallon/BUSCO_profiles/BUSCO_v2_profiles/eukaryota_odb9/"]).set{ BUSCO_lineages }
+
+BUSCO_lineages.into { BUSCO_lineages_ch1 ; BUSCO_lineages_ch2 }
+
+BUSCO_cmds_pep = BUSCO_lineages_ch1.combine(transcriptome_annotated_pep_ch2)
+BUSCO_cmds_trans = BUSCO_lineages_ch2.combine(transcriptome_annotated_fasta_ch2)
+
+BUSCO_cmds_mixed = BUSCO_cmds_pep.mix(BUSCO_cmds_trans)
+
+process do_BUSCO {
+ publishDir "transXpress_results", mode: "copy"
+ cpus 21
+
+ input:
+     set file(BUSCO_lineage), file(inputFasta) from BUSCO_cmds_mixed
+ output:
+     file 'run_'+assemblyPrefix+'*/short_summary_*'+assemblyPrefix+'*_annotated*.txt'
+ tag { inputFasta+"_"+BUSCO_lineage }
+ """
+ #! /bin/bash
+ ##A new script that uses BUSCO_v3
+
+ ##Note that BUSCO_v3 
+ #In short, I’ve cloned from the BUSCO_v3 github (https://gitlab.com/ezlab/busco) to -> /lab/solexa_weng/testtube/busco
+ #I’ve installed it to my user directory (python setup.py install --user)
+ #I’ve updated the paths & other config things in (/lab/solexa_weng/testtube/busco/config/config.ini), to the Tak paths for the appropriate software, & other settings
+
+ export AUGUSTUS_CONFIG_PATH=/lab/solexa_weng/testtube/busco/augustus_config/ ##I copied the augustus config directory myself.
+
+ BUSCO_SCRIPTS=/lab/solexa_weng/testtube/busco/scripts/
+
+ NAME=\$(basename ${inputFasta})
+ LINEAGE_NAME=\$(basename ${BUSCO_lineage})
+ 
+ if [[ \$NAME == *'.pep'* ]]; then
+  TYPE=prot
+ else
+  TYPE=transcriptome
+ fi
+
+ \${BUSCO_SCRIPTS}/run_BUSCO.py -z -t /mnt/ramdisk -f -i ${inputFasta} -l ${BUSCO_lineage} -o \${NAME}_\${LINEAGE_NAME} -m \$TYPE --cpu ${task.cpus} >./BUSCO.\${NAME}_\${LINEAGE_NAME}.stdout.log 2>./BUSCO.\${NAME}_\${LINEAGE_NAME}.stderr.log
+ find /mnt/ramdisk -name \"*\${NAME}*\${LINEAGE_NAME}*\" | xargs rm -f
+ """
+ 
 }
 
