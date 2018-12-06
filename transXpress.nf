@@ -248,6 +248,19 @@ process downloadSprot {
     """
 }
 
+process downloadVirusesUniref50 {
+  executor 'local'
+  storeDir 'db'
+  errorStrategy 'ignore'
+  output:
+    set file("virusesUniref50.fasta"), file("virusesUniref50.pep.fasta.p??") into virusDb
+  script:
+    """
+    wget -t 3 -O virusesUniref50.pep.fasta.gz "https://www.uniprot.org/uniref/?query=uniprot%3A%28taxonomy%3A%22Viruses+%5B10239%5D%22%29+AND+identity%3A0.5&format=fasta&compress=yes"
+    makeblastdb -in virusesUniref50.pep.fasta -dbtype prot
+    """
+}
+
 process sprotBlastxParallel {
   cpus 2
   input:
@@ -310,11 +323,24 @@ process rfamParallel {
   script:
     """
     echo rfam ${chunk} using database ${rfamDb}
-    cmscan --incE 0.00001 --rfam --cpu ${task.cpus} --tblout rfam_out ${rfamDb} ${chunk}
+    cmscan -E 0.00001 --incE 0.00001 --rfam --cpu ${task.cpus} --tblout rfam_out ${rfamDb} ${chunk}
     """
 }
-rfamResults.collectFile(name: 'rfam_annotations.txt').set { rfamResult }
 //rfamDomResults.collectFile(name: 'rfam_dom_annotations.txt').set { rfamDomResult }
+
+process publishRfamResults {
+  publishDir "transXpress_results", mode: "copy"
+  input:
+    file rfamResult from rfamResults.collectFile(name: 'rfam_annotations_unsorted.txt')
+  output:
+    file "rfam_annotations.txt" into rfamResultPub
+  script:
+  """
+  cat ${rfamResult} | head -n 2 > header.txt
+  cat ${rfamResult} | tail -n 9 > footer.txt
+  cat header.txt ${rfamResult} footer.txt | grep -v "#" | sort -k3,3 -k15nr,15 | sort -u -k3,3 --merge | sort -k15nr,15 > rfam_annotations.txt
+  """
+}
 
 process transdecoderPredict {
   publishDir "transXpress_results", mode: "copy" // , saveAs: { filename -> "transcriptome_after_predict.pep" }
