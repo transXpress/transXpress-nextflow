@@ -26,8 +26,8 @@ params.SIGNALP_ORGANISMS = "euk"
 /*
  * Step 1. 
  */
-process trinityInchwormChrysalis {
 
+process trinityInchwormChrysalis {
   echo = true
   label = "nf_"+assemblyPrefix+"_trinityInchwormChrysalis"
   stageInMode="copy" 
@@ -180,6 +180,9 @@ process trinityStats {
 
 process transrate {
   publishDir "transXpress_results", mode: "copy", saveAs: { filename -> "transrate_results.csv" }
+  //Can't be implemented until the absolute vs relative path in samples.txt is figured out
+  //Would be nice if there were an upstream module that pre-filtered all the read naming things.
+  //scratch params.scratch_dir
   cpus 8
   input:
     file "samples.txt" from file(params.samples)
@@ -248,6 +251,8 @@ process downloadSprot {
     """
 }
 
+/*
+This takes a looong time, even when it is working
 process downloadVirusesUniref50 {
   executor 'local'
   storeDir 'db'
@@ -260,6 +265,7 @@ process downloadVirusesUniref50 {
     makeblastdb -in virusesUniref50.pep.fasta -dbtype prot
     """
 }
+*/
 
 process sprotBlastxParallel {
   cpus 2
@@ -579,11 +585,12 @@ BUSCO_cmds_mixed = BUSCO_cmds_pep.mix(BUSCO_cmds_trans)
 process do_BUSCO {
  publishDir "transXpress_results", mode: "copy"
  cpus 21
-
+ //scratch params.scratch_dir
  input:
      set file(BUSCO_lineage), file(inputFasta) from BUSCO_cmds_mixed
  output:
-     file 'run_'+assemblyPrefix+'*/short_summary_*'+assemblyPrefix+'*_annotated*.txt'
+     file 'run_'+assemblyPrefix+'*/*'+assemblyPrefix+'*'
+     file 'run_'+assemblyPrefix+'*/*'+assemblyPrefix+'*/*'
  tag { inputFasta+"_"+BUSCO_lineage }
  """
  #! /bin/bash
