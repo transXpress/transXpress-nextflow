@@ -52,12 +52,10 @@ process trinityInchwormChrysalis {
     """
 }
 
-trinityCmds.splitText(by: 10, file: "trinityCmd").set { trinityParallelCmds }
-
 process trinityButterflyParallel {
   input:
   //  file trinityWorkDir
-    file parallelCommand from trinityParallelCmds
+    file parallelCommand from trinityCmds.splitText(by: 10, file: "trinityCmd")
   output:
     file "${parallelCommand}.completed" into trinityFinishedCmds
   tag { assemblyPrefix+"-"+parallelCommand }
@@ -68,24 +66,13 @@ process trinityButterflyParallel {
     """ 
 }
 
-process collectButterflyCmds {
-  cache 'deep'
-  input:
-    file butterflyCmds from trinityFinishedCmds.collectFile(name: "recursive_trinity.cmds.completed",sort: true)
-  output:
-    file "${butterflyCmds}" into trinityAllFinishedCmds    
-  script:
-  """
-  """
-}
-
 process trinityFinish {
    publishDir "transXpress_results", mode: "copy", saveAs: { filename -> filename.replaceAll("trinity_out_dir/Trinity", "transcriptome") }
-   cache 'deep'
+   cache 'lenient'
   input:
     file "samples.txt" from file(params.samples)
     file trinityWorkDir
-    file finishedCommands from trinityAllFinishedCmds
+    file finishedCommands from trinityFinishedCmds.collectFile(name: "recursive_trinity.cmds.completed",sort: true)
   output:
     file "${trinityWorkDir}/Trinity.fasta.gene_trans_map" into originalGeneTransMap
     file "${trinityWorkDir}/Trinity.fasta" into Trinity_fasta_ch
@@ -589,8 +576,7 @@ process do_BUSCO {
  input:
      set file(BUSCO_lineage), file(inputFasta) from BUSCO_cmds_mixed
  output:
-     file 'run_'+assemblyPrefix+'*/*'+assemblyPrefix+'*'
-     file 'run_'+assemblyPrefix+'*/*'+assemblyPrefix+'*/*'
+     file 'run_'+assemblyPrefix+'*/*'
  tag { inputFasta+"_"+BUSCO_lineage }
  """
  #! /bin/bash
