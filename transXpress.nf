@@ -73,7 +73,7 @@ process trinityFinish {
   input:
     file "samples.txt" from file(params.samples)
     file trinityWorkDir
-    file finishedCommands from trinityFinishedCmds.collectFile(name: "recursive_trinity.cmds.completed",sort: true, tempdir:params.tempdir)
+    file finishedCommands from trinityFinishedCmds.collectFile(name: "recursive_trinity.cmds.completed",sort: true)
   output:
     file "${trinityWorkDir}/Trinity.fasta.gene_trans_map" into originalGeneTransMap
     file "${trinityWorkDir}/Trinity.fasta" into Trinity_fasta_ch
@@ -284,8 +284,8 @@ process sprotBlastpParallel {
     blastp -query ${chunk} -db ${sprotDb} -num_threads ${task.cpus} -evalue 1e-6 -max_hsps 1 -max_target_seqs 1 -outfmt "6 std stitle" -out blastp_out
     """
 }
-sprotBlastxResults.collectFile(name: 'blastx_annotations.tsv',tempdir:params.tempdir).set { blastxResult }
-sprotBlastpResults.collectFile(name: 'blastp_annotations.tsv',tempdir:params.tempdir).into { blastpForTransdecoder; blastpResult }
+sprotBlastxResults.collectFile(name: 'blastx_annotations.tsv').set { blastxResult }
+sprotBlastpResults.collectFile(name: 'blastp_annotations.tsv').into { blastpForTransdecoder; blastpResult }
 
 process pfamParallel {
   cpus 2
@@ -302,8 +302,8 @@ process pfamParallel {
     hmmscan --cpu ${task.cpus} --domtblout pfam_dom_out --tblout pfam_out ${pfamDb} ${chunk}
     """
 }
-pfamResults.collectFile(name: 'pfam_annotations.txt',tempdir:params.tempdir).set { pfamResult }
-pfamDomResults.collectFile(name: 'pfam_dom_annotations.txt',tempdir:params.tempdir).into { pfamDomResult ; pfamForTransdecoder }
+pfamResults.collectFile(name: 'pfam_annotations.txt').set { pfamResult }
+pfamDomResults.collectFile(name: 'pfam_dom_annotations.txt').into { pfamDomResult ; pfamForTransdecoder }
 
 process rfamParallel {
   cpus 2
@@ -324,7 +324,7 @@ process rfamParallel {
 process publishRfamResults {
   publishDir "transXpress_results", mode: "copy"
   input:
-    file rfamResult from rfamResults.collectFile(name: 'rfam_annotations_unsorted.txt',tempdir:params.tempdir)
+    file rfamResult from rfamResults.collectFile(name: 'rfam_annotations_unsorted.txt')
   output:
     file "rfam_annotations.txt" into rfamResultPub
   script:
@@ -368,7 +368,7 @@ process signalpParallel {
     signalp -t ${params.SIGNALP_ORGANISMS} -f short ${chunk} > signalp_out
     """
 }
-signalpResults.collectFile(name: 'signalp_annotations.txt',tempdir:params.tempdir).set { signalpResult }
+signalpResults.collectFile(name: 'signalp_annotations.txt').set { signalpResult }
 
 process tmhmmParallel {
   cpus 1
@@ -383,7 +383,7 @@ process tmhmmParallel {
     tmhmm --short < ${chunk} > tmhmm_out
     """
 }
-tmhmmResults.collectFile(name: 'tmhmm_annotations.tsv',tempdir:params.tempdir).set { tmhmmResult }
+tmhmmResults.collectFile(name: 'tmhmm_annotations.tsv').set { tmhmmResult }
 
 // Collect parallelized annotations
 process annotatedFasta {
