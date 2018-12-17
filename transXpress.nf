@@ -7,7 +7,6 @@
  */
 
 
-params.TRINITY_PARAMS += " --trimmomatic --quality_trimming_params \"ILLUMINACLIP:${workflow.projectDir}/adapters.fasta:3:30:10 SLIDINGWINDOW:4:20 LEADING:20 TRAILING:20 MINLEN:25\""
 params.tempdir = "/lab/weng_scratch/tmp/"
 
 theDate = new java.util.Date().format( 'MMdd' )
@@ -28,6 +27,87 @@ params.SIGNALP_ORGANISMS = "euk"
  * Step 1. 
  */
 
+
+///
+/// Load files
+///
+
+feedback_ch = Channel.create()
+myFile = file(params.samples)
+allLines  = myFile.readLines()
+for( line in allLines ) {
+    splitline = line.split("\t")
+    println splitline
+    F_read = splitline[2]
+    R_read = splitline[3]
+    Channel.fromPath(F_read).set{ F_ch }
+    Channel.fromPath(R_read).set{ R_ch }
+    F_ch.combine(R_ch).set{ readPairs_ch }
+    }
+
+process trimmomatic {
+cpus 4
+input:
+set file(R1_reads),file(R2_reads) from readPairs_ch
+
+output:
+  file "${R1_reads}.R1-P.qtrim.fastq.gz" into filteredForwardReads_ch1,filteredForwardReads_ch2
+  file "${R2_reads}.R2-P.qtrim.fastq.gz" into filteredReverseReads_ch1,filteredReverseReads_ch2
+  file "*U.qtrim.fastq.gz" into filteredSingleReads_ch1,filteredSingleReads_ch2
+script:
+"""
+java -jar /lab/solexa_weng/testtube/trinityrnaseq-Trinity-v2.8.4/trinity-plugins/Trimmomatic/trimmomatic.jar PE -threads ${task.cpus}  ${R1_reads} ${R2_reads} ${R1_reads}.R1-P.qtrim.fastq.gz ${R1_reads}.R1-U.qtrim.fastq.gz ${R2_reads}.R2-P.qtrim.fastq.gz ${R2_reads}.R2-U.qtrim.fastq.gz  ILLUMINACLIP:/lab/solexa_weng/testtube/trinityrnaseq-Trinity-v2.8.4/trinity-plugins/Trimmomatic/adapters/TruSeq3-PE.fa:2:30:10 SLIDINGWINDOW:4:5 LEADING:5 TRAILING:5 MINLEN:25 
+"""
+}
+
+process convertSamplesToRelative {
+input:
+    file "samples.txt" from file(params.samples)
+output:
+    file "relative_samples.txt" into relative_samples_txt_ch
+
+script:
+"""
+while read LINE; do
+  START=\$(echo "\$LINE" | cut -f 1,2)
+  FORWARD=\$(echo "\$LINE" | cut -f 3 | sed -r 's/[\\/\\.].+\\///g')".R1-P.qtrim.fastq.gz"
+  REVERSE=\$(echo "\$LINE" | cut -f 4 | sed -r 's/[\\/\\.].+\\///g')".R2-P.qtrim.fastq.gz"
+  echo \$FORWARD \$REVERSE
+  echo "\${START}\t\${FORWARD}\t\${REVERSE}" >> relative_samples.txt
+done < samples.txt
+"""
+}
+
+process convertReadsToYAML {
+
+input:
+  file forwardReads from filteredForwardReads_ch1.collect()
+  file reverseReads from filteredReverseReads_ch1.collect()
+  file unpairedReads from filteredSingleReads_ch1.collect()
+output:
+  file "datasets.yaml" into datasets_YAML_ch
+script:
+"""
+   echo "[{
+        orientation: "fr",
+        type: "paired-end",
+        right reads: [" >datasets.yaml
+   ls -1 ./*.R1-P.qtrim.fastq.gz | sed 's/^/\\"/g' | sed 's/\$/\\"/g' | sed 's/@\"/\\"/g' | tr "\\n" "," | sed 's/,\$//g' >>datasets.yaml
+   echo "]," >> datasets.yaml
+   echo "left reads: [" >> datasets.yaml
+   ls -1 ./*.R2-P.qtrim.fastq.gz | sed 's/^/\\"/g' | sed 's/\$/\\"/g' | sed 's/@\"/\\"/g' | tr "\\n" "," | sed 's/,\$//g' >>datasets.yaml
+   echo "]
+      }," >>datasets.yaml
+   echo "{
+        type: "single",
+        single reads: [" >> datasets.yaml
+   ls -1 ./*U.qtrim.fastq.gz | sed 's/^/\\"/g' | sed 's/\$/\\"/g' | sed 's/@\"/\\"/g' | tr "\\n" "," | sed 's/,\$//g' >>datasets.yaml
+   echo "]}]" >> datasets.yaml
+"""  
+}
+
+
+
 process trinityInchwormChrysalis {
   echo = true
   label = "nf_"+assemblyPrefix+"_trinityInchwormChrysalis"
@@ -41,15 +121,16 @@ process trinityInchwormChrysalis {
   afterScript 'echo \"(Above completion message is from Trinity. transXpress will continue the pipeline execution.)\"'
 
   input:
-    file "samples.txt" from file(params.samples)
-    file "species.txt" from file(params.species)
+    file filteredForwardReads from filteredForwardReads_ch2.collect()
+    file filteredReverseReads from filteredReverseReads_ch2.collect()
+    file relative_samples_txt from relative_samples_txt_ch
   output:
     file "trinity_out_dir" into trinityWorkDir
     file "trinity_out_dir/recursive_trinity.cmds" into trinityCmds
 
   script:
     """
-    Trinity --no_distributed_trinity_exec --max_memory ${task.memory.toGiga()}G --CPU ${task.cpus} --samples_file ${"samples.txt"} ${params.TRINITY_PARAMS}
+    Trinity --no_distributed_trinity_exec --max_memory ${task.memory.toGiga()}G --CPU ${task.cpus} --samples_file ${relative_samples_txt} ${params.TRINITY_PARAMS}
     """
 }
 
