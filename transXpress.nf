@@ -29,22 +29,15 @@ params.SIGNALP_ORGANISMS = "euk"
 
 
 ///
-/// Load files
+/// Load read files
 ///
-
-allLines  = file(params.samples).readLines()
-F_ch = Channel.create()
-R_ch = Channel.create()
-for( line in allLines ) {
-    splitline = line.split("\t")
-    println splitline
-    F_read = splitline[2]
-    R_read = splitline[3]
-    Channel.fromPath(F_read).set{ F_ch }
-    Channel.fromPath(R_read).set{ R_ch }
-    }
-F_ch.combine(R_ch).set{ readPairs_ch }
-
+Channel.fromPath(params.samples)
+     .splitCsv(sep:'\t',header:false)
+     .map{ row ->
+     println row 
+     return tuple(file(row[2]), file(row[3])) }
+     .set{ readPairs_ch }
+ 
 process trimmomatic {
 cpus 4
 tag {"$R1_reads"+" and " +"$R2_reads"}
@@ -52,14 +45,17 @@ input:
 set file(R1_reads),file(R2_reads) from readPairs_ch
 
 output:
-  file "${R1_reads}.R1-P.qtrim.fastq.gz" into filteredForwardReads_ch1,filteredForwardReads_ch2
-  file "${R2_reads}.R2-P.qtrim.fastq.gz" into filteredReverseReads_ch1,filteredReverseReads_ch2
+  file "${R1_reads}.R1-P.qtrim.fastq.gz" into filteredForwardReads_ch
+  file "${R2_reads}.R2-P.qtrim.fastq.gz" into filteredReverseReads_ch
   file "*U.qtrim.fastq.gz" into filteredSingleReads_ch1,filteredSingleReads_ch2
 script:
 """
 java -jar /lab/solexa_weng/testtube/trinityrnaseq-Trinity-v2.8.4/trinity-plugins/Trimmomatic/trimmomatic.jar PE -threads ${task.cpus}  ${R1_reads} ${R2_reads} ${R1_reads}.R1-P.qtrim.fastq.gz ${R1_reads}.R1-U.qtrim.fastq.gz ${R2_reads}.R2-P.qtrim.fastq.gz ${R2_reads}.R2-U.qtrim.fastq.gz  ILLUMINACLIP:/lab/solexa_weng/testtube/trinityrnaseq-Trinity-v2.8.4/trinity-plugins/Trimmomatic/adapters/TruSeq3-PE.fa:2:30:10 SLIDINGWINDOW:4:5 LEADING:5 TRAILING:5 MINLEN:25 
 """
 }
+filteredForwardReads_ch.into{ filteredForwardReads_ch1; filteredForwardReads_ch2; filteredForwardReads_ch3; filteredForwardReads_ch4; filteredForwardReads_ch5 }
+filteredReverseReads_ch.into{ filteredReverseReads_ch1; filteredReverseReads_ch2; filteredReverseReads_ch3; filteredReverseReads_ch4; filteredReverseReads_ch5 }
+
 
 process convertSamplesToRelative {
 input:
@@ -78,6 +74,7 @@ while read LINE; do
 done < samples.txt
 """
 }
+relative_samples_txt_ch.into{ relative_samples_txt_ch1; relative_samples_txt_ch2; relative_samples_txt_ch3; relative_samples_txt_ch4}
 
 process convertReadsToYAML {
 
@@ -107,8 +104,6 @@ script:
 """  
 }
 
-
-
 process trinityInchwormChrysalis {
   echo = true
   label = "nf_"+assemblyPrefix+"_trinityInchwormChrysalis"
@@ -120,14 +115,34 @@ process trinityInchwormChrysalis {
   tag { assemblyPrefix }
 
   afterScript 'echo \"(Above completion message is from Trinity. transXpress will continue the pipeline execution.)\"'
-
+  //afterScript 'exit(1)'
   input:
     file filteredForwardReads from filteredForwardReads_ch2.collect()
     file filteredReverseReads from filteredReverseReads_ch2.collect()
-    file relative_samples_txt from relative_samples_txt_ch
+    file relative_samples_txt from relative_samples_txt_ch1
   output:
-    file "trinity_out_dir" into trinityWorkDir
-    file "trinity_out_dir/recursive_trinity.cmds" into trinityCmds
+    //These commented out lines load all the files into channels.
+    //file "./trinity_out_dir/*.fa" into trinityPhase1RootFiles_ch1
+    //file "./trinity_out_dir/*.ok" into trinityPhase1RootFiles_ch2
+    //file "./trinity_out_dir/*.read_count" into trinityPhase1RootFiles_ch3
+    //file "./trinity_out_dir/*.kmer_count" into trinityPhase1RootFiles_ch4
+    //file "./trinity_out_dir/*.histo" into trinityPhase1RootFiles_ch5
+    //file "./trinity_out_dir/*.cmds" into trinityPhase1RootFiles_ch6
+    //file "./trinity_out_dir/*.timing" into trinityPhase1RootFiles_ch7
+    //file "./trinity_out_dir/*.sam" into trinityPhase1RootFiles_ch8
+    //file "./trinity_out_dir/chrysalis/*.fasta" into trinityPhase1ChrysalisFiles_ch1
+    //file "./trinity_out_dir/chrysalis/*.ok" into trinityPhase1ChrysalisFiles_ch2
+    //file "./trinity_out_dir/chrysalis/*.out" into trinityPhase1ChrysalisFiles_ch3
+    //file "./trinity_out_dir/chrysalis/*.min100" into trinityPhase1ChrysalisFiles_ch4
+    //file "./trinity_out_dir/chrysalis/*.bt2" into trinityPhase1ChrysalisFiles_ch5
+    //file "./trinity_out_dir/chrysalis/*.bam" into trinityPhase1ChrysalisFiles_ch6
+    //file "./trinity_out_dir/chrysalis/*.sorted" into trinityPhase1ChrysalisFiles_ch7
+    //file "./trinity_out_dir/chrysalis/*.txt" into trinityPhase1ChrysalisFiles_ch8
+    //file "./trinity_out_dir/chrysalis/*.wIwormNames" into trinityPhase1ChrysalisFiles_ch9
+    //file "./trinity_out_dir/chrysalis/*.sort" into trinityPhase1ChrysalisFiles_ch10
+    //file "./trinity_out_dir/read_partitions/*/*/*.trinity.reads.fa" trinityPhase1ReadPartitionsFiles_ch
+    file "./trinity_out_dir" into trinityWorkDir
+    file "./trinity_out_dir/recursive_trinity.cmds" into trinityCmds
 
   script:
     """
@@ -151,21 +166,24 @@ process trinityButterflyParallel {
 
 process trinityFinish {
    publishDir "transXpress_results", mode: "copy", saveAs: { filename -> filename.replaceAll("trinity_out_dir/Trinity", "transcriptome") }
-   cache 'lenient'
   input:
-    file "samples.txt" from file(params.samples)
+    //file "./trinity_out_dir/*" from trinityPhase1RootFiles_ch1.mix(trinityPhase1RootFiles_ch2,trinityPhase1RootFiles_ch3,trinityPhase1RootFiles_ch4,trinityPhase1RootFiles_ch5,trinityPhase1RootFiles_ch6,trinityPhase1RootFiles_ch7,trinityPhase1RootFiles_ch8).collect()
+    //file "./trinity_out_dir/chrysalis/*" from trinityPhase1ChrysalisFiles_ch1.mix(trinityPhase1ChrysalisFiles_ch2,trinityPhase1ChrysalisFiles_ch3,trinityPhase1ChrysalisFiles_ch4,trinityPhase1ChrysalisFiles_ch5,trinityPhase1ChrysalisFiles_ch6,trinityPhase1ChrysalisFiles_ch7,trinityPhase1ChrysalisFiles_ch8,trinityPhase1ChrysalisFiles_ch9,trinityPhase1ChrysalisFiles_ch10).collect()
+    //file "trinity_out_dir/read_partitions/*/*/*.trinity.reads.fa" from trinityPhase1ChrysalisFiles_ch
     file trinityWorkDir
-    file finishedCommands from trinityFinishedCmds.collectFile(name: "recursive_trinity.cmds.completed",sort: true)
+    file relative_samples_txt from relative_samples_txt_ch2
+    file finishedCommands from trinityFinishedCmds.collectFile(name: "recursive_trinity.cmds.completed")
+    file filteredForwardReads from filteredForwardReads_ch3.collect()
+    file filteredReverseReads from filteredReverseReads_ch3.collect()
   output:
-    file "${trinityWorkDir}/Trinity.fasta.gene_trans_map" into originalGeneTransMap
-    file "${trinityWorkDir}/Trinity.fasta" into Trinity_fasta_ch
-    file "${trinityWorkDir}/recursive_trinity.cmds.completed"
-    file trinityWorkDir into trinityWorkDirFinal
+    file "./trinity_out_dir/Trinity.fasta.gene_trans_map" into originalGeneTransMap
+    file "./trinity_out_dir/Trinity.fasta" into Trinity_fasta_ch
+    file "./trinity_out_dir/recursive_trinity.cmds.completed"
   memory "1 GB"
   script:
     """
     cp ${finishedCommands} ${trinityWorkDir}/recursive_trinity.cmds.completed
-    Trinity --samples_file ${"samples.txt"} --max_memory ${task.memory.toGiga()}G ${params.TRINITY_PARAMS}
+    Trinity --samples_file ${relative_samples_txt} --max_memory ${task.memory.toGiga()}G ${params.TRINITY_PARAMS}
     """ 
 }
 
@@ -204,9 +222,11 @@ process kallisto {
   publishDir "transXpress_results", mode: "copy"
   cpus 10
   input:
+    file forwardReads from filteredForwardReads_ch5.collect()
+    file reverseReads from filteredReverseReads_ch5.collect()
     file transcriptomeKallisto
     file geneTransMap
-    file "samples.txt" from file(params.samples)
+    file relative_samples_txt from relative_samples_txt_ch4
   output:
     file "kallisto.isoform.TPM.not_cross_norm" into rawKallistoTable
     file "kallisto.isoform.TMM.EXPR.matrix" optional true into normalizedKallistoTable
@@ -216,7 +236,7 @@ process kallisto {
     """
     export TRINITY_HOME=\$(dirname `which Trinity`)
     echo TRINITY_HOME set to \${TRINITY_HOME}
-    \${TRINITY_HOME}/util/align_and_estimate_abundance.pl --transcripts ${transcriptomeKallisto} ${params.STRAND_SPECIFIC} --seqType fq --samples_file ${"samples.txt"} --prep_reference --thread_count ${task.cpus} --est_method kallisto --gene_trans_map ${geneTransMap}
+    \${TRINITY_HOME}/util/align_and_estimate_abundance.pl --transcripts ${transcriptomeKallisto} ${params.STRAND_SPECIFIC} --seqType fq --samples_file ${relative_samples_txt} --prep_reference --thread_count ${task.cpus} --est_method kallisto --gene_trans_map ${geneTransMap}
     \${TRINITY_HOME}/util/abundance_estimates_to_matrix.pl --est_method kallisto --name_sample_by_basedir --gene_trans_map $geneTransMap */abundance.tsv
     """
 }
@@ -255,7 +275,9 @@ process transrate {
   //scratch params.scratch_dir
   cpus 8
   input:
-    file "samples.txt" from file(params.samples)
+    file filteredForwardReads from filteredForwardReads_ch4.collect()
+    file filteredReverseReads from filteredReverseReads_ch4.collect()
+    file relative_samples_txt from relative_samples_txt_ch3
     file transcriptomeTransrate 
   output:
     file "transrate_results/"+assemblyPrefix+"/contigs.csv" into transrateResults
@@ -266,8 +288,8 @@ process transrate {
 
   script:
     """
-    LEFT=`cut -f 3 < ${"samples.txt"} | tr '\n' ' ' | sed 's/ *\$//g'`
-    RIGHT=`cut -f 4 < ${"samples.txt"} | tr '\n' ' ' | sed 's/ *\$//g'`
+    LEFT=`cut -f 3 < ${relative_samples_txt} | tr '\n' ' ' | sed 's/ *\$//g'`
+    RIGHT=`cut -f 4 < ${relative_samples_txt} | tr '\n' ' ' | sed 's/ *\$//g'`
     seqkit replace -p '_forward/1' -r '' \$LEFT | gzip > F_reads.fq.gz
     seqkit replace -p '_reverse/2' -r '' \$RIGHT | gzip > R_reads.fq.gz
     transrate --threads ${task.cpus} --assembly=${transcriptomeTransrate} --left=F_reads.fq.gz --right=R_reads.fq.gz
