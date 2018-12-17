@@ -32,9 +32,9 @@ params.SIGNALP_ORGANISMS = "euk"
 /// Load files
 ///
 
-feedback_ch = Channel.create()
-myFile = file(params.samples)
-allLines  = myFile.readLines()
+allLines  = file(params.samples).readLines()
+F_ch = Channel.create()
+R_ch = Channel.create()
 for( line in allLines ) {
     splitline = line.split("\t")
     println splitline
@@ -42,11 +42,12 @@ for( line in allLines ) {
     R_read = splitline[3]
     Channel.fromPath(F_read).set{ F_ch }
     Channel.fromPath(R_read).set{ R_ch }
-    F_ch.combine(R_ch).set{ readPairs_ch }
     }
+F_ch.combine(R_ch).set{ readPairs_ch }
 
 process trimmomatic {
 cpus 4
+tag {"$R1_reads"+" and " +"$R2_reads"}
 input:
 set file(R1_reads),file(R2_reads) from readPairs_ch
 

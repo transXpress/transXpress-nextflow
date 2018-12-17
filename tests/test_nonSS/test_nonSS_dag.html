@@ -106,8 +106,8 @@
 elements: {
 nodes: [
 { data: { id: 'p0', label: 'Channel.fromPath'}, classes: 'ORIGIN' },
-{ data: { id: 'p1', label: 'Channel.fromPath'}, classes: 'ORIGIN' },
-{ data: { id: 'p2', label: 'combine'}, classes: 'OPERATOR' },
+{ data: { id: 'p1'}, classes: 'NODE' },
+{ data: { id: 'p2', label: 'Channel.fromPath'}, classes: 'ORIGIN' },
 { data: { id: 'p3'}, classes: 'NODE' },
 { data: { id: 'p4', label: 'Channel.fromPath'}, classes: 'ORIGIN' },
 { data: { id: 'p5', label: 'Channel.fromPath'}, classes: 'ORIGIN' },
@@ -180,8 +180,7 @@ nodes: [
 { data: { id: 'p72', label: 'do_BUSCO'}, classes: 'PROCESS' },
 ],
 edges: [
-{ data: { source: 'p0', target: 'p2'} },
-{ data: { source: 'p1', target: 'p2'} },
+{ data: { source: 'p0', target: 'p1'} },
 { data: { source: 'p2', target: 'p3'} },
 { data: { source: 'p4', target: 'p6', label: 'F_ch' } },
 { data: { source: 'p5', target: 'p6', label: 'R_ch' } },
