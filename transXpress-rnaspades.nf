@@ -40,8 +40,8 @@ process trimmomatic {
 
 cpus 4
 input:
-set file(R1_reads),file(R2_reads) from readPairs_ch
-tag {assemblePrefix + R1_reads}
+ set file(R1_reads),file(R2_reads) from readPairs_ch
+tag {"$R1_reads"+" and " +"$R2_reads"}
 output:
   set file("${R1_reads}.R1-P.qtrim.fastq.gz"), file("${R2_reads}.R2-P.qtrim.fastq.gz") into filteredPairedReads_ch1,filteredPairedReads_ch2,filteredPairedReads_ch5
   //file "${R1_reads}.R1-P.qtrim.fastq.gz" into filteredForwardReads_ch1,filteredForwardReads_ch2,filteredForwardReads_ch5
@@ -114,8 +114,6 @@ script:
 }
 
 process runSPAdes {
-executor 'lsf'
-
 cpus 16
 memory "200 GB"
 
@@ -188,12 +186,11 @@ process downloadVirusesUniref50 {
   storeDir '/lab/solexa_weng/tmp/db'
   errorStrategy 'ignore'
   output:
-    set file("virusesUniref50.fasta"), file("virusesUniref50.pep.fasta.p??") into virusDb
+    set file("virusesUniref50.pep.fasta"), file("virusesUniref50.pep.fasta.p??") into virusDb
   script:
     """
     wget -t 3 -O virusesUniref50.pep.fasta.gz "https://www.uniprot.org/uniref/?query=uniprot%3A%28taxonomy%3A%22Viruses+%5B10239%5D%22%29+AND+identity%3A0.5&format=fasta&compress=yes"
     gunzip virusesUniref50.pep.fasta.gz
-    unalias makeblastdb ##On WI hardware, makeblastdb is aliased to a non-blocking cluster submission, which screws up the process
     makeblastdb -in virusesUniref50.pep.fasta -dbtype prot
     """
 }
@@ -387,9 +384,10 @@ process kallistoDirect {
  cpus 16
  input:
   file kallistoIndex
-  set file(forwardReads), file(reverseReads) from filteredPairedReads_ch5.collect()
+  set file(forwardReads), file(reverseReads) from filteredPairedReads_ch5
  output:
   file "output*" into kallistoResults
+ tag {assemblyPrefix + forwardReads}
  script:
  """
  kallisto quant -t ${task.cpus} -i ${kallistoIndex} -o output -b 100 ${forwardReads} ${reverseReads}

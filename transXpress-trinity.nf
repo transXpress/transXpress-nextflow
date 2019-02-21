@@ -39,10 +39,9 @@ Channel.fromPath(params.samples)
  
 process trimmomatic {
 cpus 4
-tag {"$R1_reads"+" and " +"$R2_reads"}
 input:
-set file(R1_reads),file(R2_reads) from readPairs_ch
-
+ set file(R1_reads),file(R2_reads) from readPairs_ch
+tag {"$R1_reads"+" and " +"$R2_reads"}
 output:
   file "${R1_reads}.R1-P.qtrim.fastq.gz" into filteredForwardReads_ch
   file "${R2_reads}.R2-P.qtrim.fastq.gz" into filteredReverseReads_ch
@@ -319,22 +318,19 @@ process downloadSprot {
     """
 }
 
-/*
-This takes a looong time, even when it is working
 process downloadVirusesUniref50 {
   executor 'local'
   storeDir '/lab/solexa_weng/tmp/db'
   errorStrategy 'ignore'
   output:
-    set file("virusesUniref50.fasta"), file("virusesUniref50.pep.fasta.p??") into virusDb
+    set file("virusesUniref50.pep.fasta"), file("virusesUniref50.pep.fasta.p??") into virusDb
   script:
     """
-    wget -t 3 -O virusesUniref50.pep.fasta.gz "https://www.uniprot.org/uniref/?query=uniprot%3A%28taxonomy%3A%22Viruses+%5B10239%5D%22%29+AND+identity%3A0.5&format=fasta&compress=yes"
+    wget -t 3 -O virusesUniref50.pep.fasta.gz "https://www.uniprot.org/uniref/?query=uniprot%3A%28taxonomy%3A%22Viruses+%5B10239%5D%22%29+AND+identity%3A0.5&format=fa$
     gunzip virusesUniref50.pep.fasta.gz
     makeblastdb -in virusesUniref50.pep.fasta -dbtype prot
     """
 }
-*/
 
 process sprotBlastxParallel {
   cpus 2
