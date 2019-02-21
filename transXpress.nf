@@ -417,6 +417,7 @@ process publishRfamResults {
 
 process transdecoderPredict {
   publishDir "transXpress_results", mode: "copy" // , saveAs: { filename -> "transcriptome_after_predict.pep" }
+  tag { assemblyPrefix }
   input:
     file transdecoderWorkDir
     file transcriptomeTransdecoderPredict
