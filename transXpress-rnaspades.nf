@@ -339,15 +339,18 @@ process signalpParallel {
 signalpResults.collectFile(name: 'signalp_annotations.txt').set { signalpResult }
 
 
-process deeplocParallels {
+process deeplocParallel {
 
   input:
     file chunk from deeplocChunks
   output:
-    file "${chunk}.out" into deeplocResults
+    file "${chunk}.out.txt" into deeplocResults
   tag { assemblyPrefix+"-"+chunk }
   script:
     """
+    export MKL_THREADING_LAYER=GNU
+    export PATH="/lab/solexa_weng/testtube/miniconda3/bin:$PATH"
+    
     deeploc -f ${chunk} -o ${chunk}.out
     """
 }
@@ -407,7 +410,8 @@ process annotatedFasta {
     file pfamResult 
     file pfamDomResult 
     file signalpResult
-    file tmhmmResult 
+    file tmhmmResult
+    file deeplocResult 
   output:
     file assemblyPrefix+"_annotated.fasta" into transcriptome_annotated_fasta_ch
     file assemblyPrefix+"_annotated.pep" into transcriptome_annotated_pep_ch
@@ -433,6 +437,7 @@ process annotatedFasta {
     pfam_annotations = {}
     tmhmm_annotations = {}
     signalp_annotations = {}
+    deeploc_annotations = {}
 
     ## Load kallisto results
     ##Unplugged transtrate, add a dollar sign in front of kallistoFile to plug back in
@@ -478,6 +483,14 @@ process annotatedFasta {
         if (len(row) < 6): continue
         tmhmm_annotations[row[0]] = row[2] + ", " + row[3] + ", " + row[4] + ", " + row[5]
     
+    ## Load deeploc results
+    print ("Loading deeploc predictions from ${deeplocResult}")
+    with open(${deeplocResult}) as input_handle:
+      csv_reader = csv.reader(input_handle, delimiter="\t")
+      for row in csv_reader:
+        if (len(row) < 2): continue
+        deeploc_annotations[row[0]] = str(row[1])
+
     ## Load signalp results
     print ("Loading signalp predictions from ${signalpResult}")
     with open("${signalpResult}") as input_handle:
@@ -492,8 +505,6 @@ process annotatedFasta {
     with open("${transcriptomeFile}", 'r') as input_fasta_handle, open("${assemblyPrefix}_annotated.fasta", 'w') as output_fasta_handle:
       for record in Bio.SeqIO.parse(input_fasta_handle, "fasta"):
         transcript_id = record.id
-        if transcript_id in transrate_annotations:
-          record.description += "; transrate: " + transrate_annotations.get(transcript_id)
         if transcript_id in blastx_annotations:
           record.description += "; blastx: " + blastx_annotations.get(transcript_id)
         Bio.SeqIO.write(record, output_fasta_handle, "fasta")
@@ -503,14 +514,14 @@ process annotatedFasta {
       for record in Bio.SeqIO.parse(input_fasta_handle, "fasta"):
         transcript_id = re.sub("\\.p[0-9]+\$", "", record.id)
         record.description = "transdecoder " + re.search("ORF type:[^,]+,score=[^,]+", record.description).group(0)
-        if transcript_id in transrate_annotations:
-          record.description += "; transrate: " + transrate_annotations.get(transcript_id)
         if record.id in blastp_annotations:
           record.description += "; blastp: " + blastp_annotations.get(record.id)
         if record.id in pfam_annotations:
           record.description += "; pfam: " + pfam_annotations.get(record.id)
         if record.id in tmhmm_annotations:
           record.description += "; tmhmm: " + tmhmm_annotations.get(record.id)
+        if record.id in deeploc_annotations:
+          record.description += "; deeploc: " + deeploc_annotations.get(record.id)
         if record.id in signalp_annotations:
           record.description += "; signalp: " + signalp_annotations.get(record.id)
         Bio.SeqIO.write(record, output_fasta_handle, "fasta")
