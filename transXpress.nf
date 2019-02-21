@@ -179,6 +179,7 @@ process trinityFinish {
     file "./trinity_out_dir/Trinity.fasta" into Trinity_fasta_ch
     file "./trinity_out_dir/recursive_trinity.cmds.completed"
   memory "1 GB"
+  tag { assemblyPrefix }
   script:
     """
     cp ${finishedCommands} ${trinityWorkDir}/recursive_trinity.cmds.completed
@@ -188,7 +189,7 @@ process trinityFinish {
 
 process renameTrinityAssembly {
    publishDir "transXpress_results", mode: "copy"
-
+   tag { assemblyPrefix }
    input: 
     file "Trinity.fasta" from Trinity_fasta_ch
     file "species.txt" from file(params.species) //Just a dummy input
@@ -206,6 +207,7 @@ process renameTrinityAssembly {
 
 process transdecoderLongOrfs {
   publishDir "transXpress_results", mode: "copy"
+  tag { assemblyPrefix }
   input:
     file transcriptomeTransdecoder
   output:
@@ -220,6 +222,7 @@ process transdecoderLongOrfs {
 process kallisto {
   publishDir "transXpress_results", mode: "copy"
   cpus 10
+  tag { assemblyPrefix }
   input:
     file forwardReads from filteredForwardReads_ch5.collect()
     file reverseReads from filteredReverseReads_ch5.collect()
