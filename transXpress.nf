@@ -21,7 +21,6 @@ log.info """
  ===================================
  """+assemblyPrefix
 
-params.SIGNALP_ORGANISMS = "euk"
 
 /*
  * Step 1. 
@@ -195,7 +194,7 @@ process renameTrinityAssembly {
     file "species.txt" from file(params.species) //Just a dummy input
     file "Trinity.fasta.gene_trans_map" from originalGeneTransMap
    output:
-    file assemblyPrefix+".fasta" into transcriptomeKallisto, transcriptomeTransdecoder, transcriptomeTransdecoderPredict, transcriptomeStats, transcriptomeTransrate, transcriptomeSplit, transcriptomeAnnotation
+    file assemblyPrefix+".fasta" into transcriptomeKallisto, transcriptomeTransdecoder, transcriptomeTransdecoderPredict, transcriptomeStats, transcriptomeSplit, transcriptomeAnnotation
     file "Trinity_renamed.fasta.gene_trans_map" into geneTransMap
 
    script:
@@ -268,33 +267,6 @@ process trinityStats {
     """
 }
 
-process transrate {
-  publishDir "transXpress_results", mode: "copy", saveAs: { filename -> "transrate_results.csv" }
-  //Can't be implemented until the absolute vs relative path in samples.txt is figured out
-  //Would be nice if there were an upstream module that pre-filtered all the read naming things.
-  //scratch params.scratch_dir
-  cpus 8
-  input:
-    file filteredForwardReads from filteredForwardReads_ch4.collect()
-    file filteredReverseReads from filteredReverseReads_ch4.collect()
-    file relative_samples_txt from relative_samples_txt_ch3
-    file transcriptomeTransrate 
-  output:
-    file "transrate_results/"+assemblyPrefix+"/contigs.csv" into transrateResults
-
-/// This strips out the odd read naming from SRA, that screws up transrate
-/// seqkit replace -p '_forward/1' -r '' \$LEFT | gzip > F_reads.fq.gz
-/// seqkit replace -p '_reverse/2' -r '' \$RIGHT | gzip > R_reads.fq.gz
-
-  script:
-    """
-    LEFT=`cut -f 3 < ${relative_samples_txt} | tr '\n' ' ' | sed 's/ *\$//g'`
-    RIGHT=`cut -f 4 < ${relative_samples_txt} | tr '\n' ' ' | sed 's/ *\$//g'`
-    seqkit replace -p '_forward/1' -r '' \$LEFT | gzip > F_reads.fq.gz
-    seqkit replace -p '_reverse/2' -r '' \$RIGHT | gzip > R_reads.fq.gz
-    transrate --threads ${task.cpus} --assembly=${transcriptomeTransrate} --left=F_reads.fq.gz --right=R_reads.fq.gz
-    """
-}
 
 transcriptomeSplit
   .splitFasta(by: 100, file: true)
@@ -457,22 +429,21 @@ process transdecoderPredict {
 
 predictProteomeSplit
   .splitFasta(by: 100, file: true)
-  .into { signalpChunks; tmhmmChunks }
+  .into { deeplocChunks; tmhmmChunks }
 
-process signalpParallel {
-  cpus 1
+process deeplocParallel {
+
   input:
-    file chunk from signalpChunks
+    file chunk from deeplocChunks
   output:
-    file "signalp_out" into signalpResults
-  tag { assemblyPrefix+"-"+chunk }
+    file "${chunk}.out} into deeplocResults
+  tag { assemblyPrefix+"-"+chunk }"
   script:
     """
-    echo signalp ${chunk}
-    signalp -t ${params.SIGNALP_ORGANISMS} -f short ${chunk} > signalp_out
+    deeploc -f ${chunk} -o ${chunk}.out
     """
 }
-signalpResults.collectFile(name: 'signalp_annotations.txt').set { signalpResult }
+deeplocResults.collectFile(name: 'deeploc_annotations.txt').set { deeplocResult }
 
 process tmhmmParallel {
   cpus 1
@@ -495,13 +466,12 @@ process annotatedFasta {
   input:
     file transcriptomeFile from transcriptomeAnnotation
     file proteomeFile from predictProteome
-    file transrateFile from transrateResults
     file kallistoFile from transcriptExpression
     file blastxResult 
     file blastpResult
     file pfamResult 
     file pfamDomResult 
-    file signalpResult
+    file deeplocResult
     file tmhmmResult 
   output:
     file assemblyPrefix+"_annotated.fasta" into transcriptome_annotated_fasta_ch
@@ -511,7 +481,7 @@ process annotatedFasta {
     file "${blastpResult}"
     file "${pfamResult}"
     file "${pfamDomResult}"
-    file "${signalpResult}"
+    file "${deeplocResult}"
     file "${tmhmmResult}"
   script:
     """
@@ -523,12 +493,11 @@ process annotatedFasta {
   
     ## Annotation maps: transcript id -> annotation
     expression_annotations = {}
-    transrate_annotations = {}
     blastx_annotations = {}
     blastp_annotations = {}
     pfam_annotations = {}
     tmhmm_annotations = {}
-    signalp_annotations = {}
+    deeploc_annotations = {}
 
     ## Load kallisto results
     print ("Loading expression values from ${kallistoFile}")
@@ -539,15 +508,6 @@ process annotatedFasta {
         expression_annotations[row[0]] = columns[1] + "=" + str(row[1])
         for i in range(2, len(columns)):
           expression_annotations[row[0]] += " " + columns[i] + "=" + str(row[i])
-
-    ## Load transrate results
-    print ("Loading transrate results from ${transrateFile}")
-    with open("${transrateFile}") as input_handle:
-      csv_reader = csv.reader(input_handle, delimiter=',')
-      columns = next(csv_reader)
-      for row in csv_reader:
-        if (len(row) < 18): continue
-        transrate_annotations[row[0]] = columns[5] + "=" + str(row[5]) + " " + columns[7] + "=" + str(row[7])
 
     ## Load blastx results
     print ("Loading blastx results from ${blastxResult}")
@@ -582,14 +542,13 @@ process annotatedFasta {
         if (len(row) < 6): continue
         tmhmm_annotations[row[0]] = row[2] + ", " + row[3] + ", " + row[4] + ", " + row[5]
     
-    ## Load signalp results
-    print ("Loading signalp predictions from ${signalpResult}")
-    with open("${signalpResult}") as input_handle:
-      for line in input_handle:
-        if (line.startswith("#")): continue
-        row = re.split(" +", line)
-        if (len(row) < 9): continue
-        signalp_annotations[row[0]] = str(row[9]) + ", D=" + str(row[8]) + ", pos=" + str(row[2])
+    ## Load deeploc results
+    print ("Loading deeploc predictions from ${deeplocResutl}")
+      with open(${deeplocResult}) as input_handle:
+        csv_reader = csv.reader(input_handle, delimiter="\t")
+        for row in csv_reader:
+          if (len(row) < 2): continue
+          deeploc_annotations[row[0]] = str(row[1])
     
     ## Do the work
     print ("Annotating FASTA file ${transcriptomeFile}")
@@ -597,8 +556,6 @@ process annotatedFasta {
       for record in Bio.SeqIO.parse(input_fasta_handle, "fasta"):
         transcript_id = record.id
         record.description = "TPM: " + expression_annotations.get(transcript_id)
-        if transcript_id in transrate_annotations:
-          record.description += "; transrate: " + transrate_annotations.get(transcript_id)
         if transcript_id in blastx_annotations:
           record.description += "; blastx: " + blastx_annotations.get(transcript_id)
         Bio.SeqIO.write(record, output_fasta_handle, "fasta")
@@ -610,16 +567,14 @@ process annotatedFasta {
         record.description = "transdecoder " + re.search("ORF type:[^,]+,score=[^,]+", record.description).group(0)
         if transcript_id in expression_annotations:
           record.description += "; TPM: " + expression_annotations.get(transcript_id)
-        if transcript_id in transrate_annotations:
-          record.description += "; transrate: " + transrate_annotations.get(transcript_id)
         if record.id in blastp_annotations:
           record.description += "; blastp: " + blastp_annotations.get(record.id)
         if record.id in pfam_annotations:
           record.description += "; pfam: " + pfam_annotations.get(record.id)
         if record.id in tmhmm_annotations:
           record.description += "; tmhmm: " + tmhmm_annotations.get(record.id)
-        if record.id in signalp_annotations:
-          record.description += "; signalp: " + signalp_annotations.get(record.id)
+        if record.id in deeploc_annotations:
+          record.description += "; deeploc: " + deeploc_annotations.get(record.id)
         Bio.SeqIO.write(record, output_fasta_handle, "fasta")
 
     print ("Generating transcriptome_TPM_blast.csv table")
@@ -631,11 +586,9 @@ process annotatedFasta {
       for i in range(1, len(csv_columns)):
         csv_columns[i] = "TPM(" + csv_columns[i] + ")"
       csv_columns.append("blastx")
-      csv_columns.append("transrate")
       csv_writer.writerow(csv_columns)
       for row in csv_reader:
         row.append(blastx_annotations.get(row[0], ""))
-        row.append(transrate_annotations.get(row[0], ""))
         csv_writer.writerow(row)
    
     """
