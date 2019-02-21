@@ -485,7 +485,7 @@ process annotatedFasta {
     
     ## Load deeploc results
     print ("Loading deeploc predictions from ${deeplocResult}")
-    with open(${deeplocResult}) as input_handle:
+    with open("${deeplocResult}") as input_handle:
       csv_reader = csv.reader(input_handle, delimiter="\t")
       for row in csv_reader:
         if (len(row) < 2): continue

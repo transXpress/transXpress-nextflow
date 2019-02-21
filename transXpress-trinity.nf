@@ -292,6 +292,20 @@ process downloadPfam {
     """
 }
 
+process downloadVirusesUniref50 {
+  executor 'local'
+  storeDir '/lab/solexa_weng/tmp/db'
+  errorStrategy 'ignore'
+  output:
+    set file("virusesUniref50.pep.fasta"), file("virusesUniref50.pep.fasta.p??") into virusDb
+  script:
+    """
+    wget -t 3 -O virusesUniref50.pep.fasta.gz "https://www.uniprot.org/uniref/?query=uniprot%3A%28taxonomy%3A%22Viruses+%5B10239%5D%22%29+AND+identity%3A0.5&format=fasta&compress=yes"
+    gunzip virusesUniref50.pep.fasta.gz
+    makeblastdb -in virusesUniref50.pep.fasta -dbtype prot
+    """
+}
+
 process downloadRfam {
   executor 'local'
   storeDir '/lab/solexa_weng/tmp/db'
@@ -318,19 +332,6 @@ process downloadSprot {
     """
 }
 
-process downloadVirusesUniref50 {
-  executor 'local'
-  storeDir '/lab/solexa_weng/tmp/db'
-  errorStrategy 'ignore'
-  output:
-    set file("virusesUniref50.pep.fasta"), file("virusesUniref50.pep.fasta.p??") into virusDb
-  script:
-    """
-    wget -t 3 -O virusesUniref50.pep.fasta.gz "https://www.uniprot.org/uniref/?query=uniprot%3A%28taxonomy%3A%22Viruses+%5B10239%5D%22%29+AND+identity%3A0.5&format=fa$
-    gunzip virusesUniref50.pep.fasta.gz
-    makeblastdb -in virusesUniref50.pep.fasta -dbtype prot
-    """
-}
 
 process sprotBlastxParallel {
   cpus 2
@@ -438,10 +439,12 @@ process deeplocParallel {
   input:
     file chunk from deeplocChunks
   output:
-    file "${chunk}.out*" into deeplocResults
+    file "${chunk}.out.txt" into deeplocResults
   tag { assemblyPrefix+"-"+chunk }
   script:
     """
+    export MKL_THREADING_LAYER=GNU
+    export PATH="/lab/solexa_weng/testtube/miniconda3/bin:$PATH"
     deeploc -f ${chunk} -o ${chunk}.out
     """
 }
@@ -545,12 +548,12 @@ process annotatedFasta {
         tmhmm_annotations[row[0]] = row[2] + ", " + row[3] + ", " + row[4] + ", " + row[5]
     
     ## Load deeploc results
-    print ("Loading deeploc predictions from ${deeplocResutl}")
-      with open(${deeplocResult}) as input_handle:
-        csv_reader = csv.reader(input_handle, delimiter="\t")
-        for row in csv_reader:
-          if (len(row) < 2): continue
-          deeploc_annotations[row[0]] = str(row[1])
+    print ("Loading deeploc predictions from ${deeplocResult}")
+    with open("${deeplocResult}") as input_handle:
+      csv_reader = csv.reader(input_handle, delimiter="\t")
+      for row in csv_reader:
+        if (len(row) < 2): continue
+        deeploc_annotations[row[0]] = str(row[1])
     
     ## Do the work
     print ("Annotating FASTA file ${transcriptomeFile}")
