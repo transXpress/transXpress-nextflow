@@ -293,12 +293,12 @@ process downloadRfam {
   executor 'local'
   storeDir '/lab/solexa_weng/tmp/db'
   output:
-    set file("Rfam_with_desc.cm"), file("Rfam_with_desc.cm.???") into rfamDb
+    set file("Rfam.cm"), file("Rfam.cm.???") into rfamDb
   script:
     """
-    wget "ftp://ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/Rfam_with_desc.cm.gz"
-    gunzip Rfam_with_desc.cm.gz
-    cmpress Rfam_with_desc.cm
+    wget "ftp://ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/Rfam.cm.gz"
+    gunzip Rfam.cm.gz
+    cmpress Rfam.cm
     """
 }
 
