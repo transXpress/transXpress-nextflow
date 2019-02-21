@@ -41,7 +41,7 @@ process trimmomatic {
 cpus 4
 input:
 set file(R1_reads),file(R2_reads) from readPairs_ch
-
+tag {assemblePrefix + R1_reads}
 output:
   set file("${R1_reads}.R1-P.qtrim.fastq.gz"), file("${R2_reads}.R2-P.qtrim.fastq.gz") into filteredPairedReads_ch1,filteredPairedReads_ch2,filteredPairedReads_ch5
   //file "${R1_reads}.R1-P.qtrim.fastq.gz" into filteredForwardReads_ch1,filteredForwardReads_ch2,filteredForwardReads_ch5
@@ -162,31 +162,6 @@ process transdecoderLongOrfs {
     """
 }
 
-/*
-process transrate {
-  publishDir "transXpress_results", mode: "copy", saveAs: { filename -> "transrate_results.csv" }
-  cpus 8
-  input:
-    file "samples.txt" from file(params.samples)
-    file transcriptomeTransrate 
-  output:
-    file "transrate_results/"+assemblyPrefix+"/contigs.csv" into transrateResults
-
-/// This strips out the odd read naming from SRA, that screws up transrate
-/// seqkit replace -p '_forward/1' -r '' \$LEFT | gzip > F_reads.fq.gz
-/// seqkit replace -p '_reverse/2' -r '' \$RIGHT | gzip > R_reads.fq.gz
-
-  script:
-    """
-    LEFT=`cut -f 3 < ${"samples.txt"} | tr '\n' ' ' | sed 's/ *\$//g'`
-    RIGHT=`cut -f 4 < ${"samples.txt"} | tr '\n' ' ' | sed 's/ *\$//g'`
-    seqkit replace -p '_forward/1' -r '' \$LEFT | gzip > F_reads.fq.gz
-    seqkit replace -p '_reverse/2' -r '' \$RIGHT | gzip > R_reads.fq.gz
-    transrate --threads ${task.cpus} --assembly=${transcriptomeTransrate} --left=F_reads.fq.gz --right=R_reads.fq.gz
-    """
-}
-*/
-
 transcriptomeSplit
   .splitFasta(by: 100, file: true)
   .into { sprotBlastxChunks; rfamChunks }
@@ -218,6 +193,7 @@ process downloadVirusesUniref50 {
     """
     wget -t 3 -O virusesUniref50.pep.fasta.gz "https://www.uniprot.org/uniref/?query=uniprot%3A%28taxonomy%3A%22Viruses+%5B10239%5D%22%29+AND+identity%3A0.5&format=fasta&compress=yes"
     gunzip virusesUniref50.pep.fasta.gz
+    unalias makeblastdb ##On WI hardware, makeblastdb is aliased to a non-blocking cluster submission, which screws up the process
     makeblastdb -in virusesUniref50.pep.fasta -dbtype prot
     """
 }
@@ -427,7 +403,6 @@ process annotatedFasta {
   input:
     file transcriptomeFile from transcriptomeAnnotation
     file proteomeFile from predictProteome
-    //file transrateFile from transrateResults
     //file kallistoFile from transcriptExpression
     file blastxResult 
     file blastpResult
@@ -471,15 +446,6 @@ process annotatedFasta {
     ##    expression_annotations[row[0]] = columns[1] + "=" + str(row[1])
     ##    for i in range(2, len(columns)):
     ##      expression_annotations[row[0]] += " " + columns[i] + "=" + str(row[i])
-
-    ## Load transrate results
-    #Ungplugged transrate. Add a \$ back in front of the brackers if plugging back in ## print ("Loading transrate results from {transrateFile}")
-    ##Ungplugged transrate. Add a \$ back in front of the brackers if plugging back in #with open("{transrateFile}") as input_handle:
-    #  csv_reader = csv.reader(input_handle, delimiter=',')
-    #  columns = next(csv_reader)
-    #  for row in csv_reader:
-    #    if (len(row) < 18): continue
-    #    transrate_annotations[row[0]] = columns[5] + "=" + str(row[5]) + " " + columns[7] + "=" + str(row[7])
 
     ## Load blastx results
     print ("Loading blastx results from ${blastxResult}")
