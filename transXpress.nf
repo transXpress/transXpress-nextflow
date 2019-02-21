@@ -436,8 +436,8 @@ process deeplocParallel {
   input:
     file chunk from deeplocChunks
   output:
-    file "${chunk}.out} into deeplocResults
-  tag { assemblyPrefix+"-"+chunk }"
+    file "${chunk}.out*" into deeplocResults
+  tag { assemblyPrefix+"-"+chunk }
   script:
     """
     deeploc -f ${chunk} -o ${chunk}.out
