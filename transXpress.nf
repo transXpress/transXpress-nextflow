@@ -278,7 +278,7 @@ longOrfsProteomeSplit
 
 process downloadPfam {
   executor 'local'
-  storeDir 'db'
+  storeDir '/lab/solexa_weng/tmp/db'
   output:
     set file("Pfam-A.hmm"), file("Pfam-A.hmm.h??") into pfamDb
   script:
@@ -291,7 +291,7 @@ process downloadPfam {
 
 process downloadRfam {
   executor 'local'
-  storeDir 'db'
+  storeDir '/lab/solexa_weng/tmp/db'
   output:
     set file("Rfam_with_desc.cm"), file("Rfam_with_desc.cm.???") into rfamDb
   script:
@@ -304,7 +304,7 @@ process downloadRfam {
 
 process downloadSprot {
   executor 'local'
-  storeDir 'db'
+  storeDir '/lab/solexa_weng/tmp/db'
   output:
     set file("uniprot_sprot.fasta"), file("uniprot_sprot.fasta.p??") into sprotDb
   script:
@@ -319,7 +319,7 @@ process downloadSprot {
 This takes a looong time, even when it is working
 process downloadVirusesUniref50 {
   executor 'local'
-  storeDir 'db'
+  storeDir '/lab/solexa_weng/tmp/db'
   errorStrategy 'ignore'
   output:
     set file("virusesUniref50.fasta"), file("virusesUniref50.pep.fasta.p??") into virusDb
