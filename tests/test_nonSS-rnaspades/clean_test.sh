@@ -1,0 +1,1 @@
+../test_nonSS-trinity/clean_test.sh
