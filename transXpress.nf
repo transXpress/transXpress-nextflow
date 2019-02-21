@@ -251,6 +251,7 @@ normalizedKallistoTable
 process trinityStats {
   publishDir "transXpress_results", mode: "copy"
   cpus 1
+  tag { assemblyPrefix }
   input:
     file transcriptomeStats
     file expressionStats
