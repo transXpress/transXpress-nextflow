@@ -330,6 +330,7 @@ process downloadVirusesUniref50 {
   script:
     """
     wget -t 3 -O virusesUniref50.pep.fasta.gz "https://www.uniprot.org/uniref/?query=uniprot%3A%28taxonomy%3A%22Viruses+%5B10239%5D%22%29+AND+identity%3A0.5&format=fasta&compress=yes"
+    gunzip virusesUniref50.pep.fasta.gz
     makeblastdb -in virusesUniref50.pep.fasta -dbtype prot
     """
 }
