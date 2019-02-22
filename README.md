@@ -23,5 +23,8 @@ Requires
 
 ## Flow
 
-rnaSPAdes
-![Directed acyclic graph for program execution](./tests/test_nonSS-rnaspades/test_nonSS_dag.svg)
+**Trinity**
+![Directed acyclic graph for Trinity transXpress-nextflow program execution](./tests/test_nonSS-trinity/test_nonSS_dag.svg)
+
+**rnaSPAdes**
+![Directed acyclic graph for rnaSPAdes transXpress-rnaspades program execution](./tests/test_nonSS-rnaspades/test_nonSS_dag.svg)
