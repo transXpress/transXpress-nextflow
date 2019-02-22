@@ -1,5 +1,12 @@
 #!/bin/bash
 
+if [ $# -lt 1 ]; then
+  echo Usage:
+  echo "./run.sh <ASSEMBLER>"
+  echo "where <ASSEMBLER> is either 'trinity' or 'rnaspades'"
+  exit 1
+fi
+
 ASSEMBLER=$1
 export NXF_ANSI_LOG='false'
 GIT_DIR=$(dirname $(readlink -f ./transXpress-$ASSEMBLER.nf))"/.git"
