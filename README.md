@@ -29,7 +29,7 @@ Setup the mandatory 'samples.txt' file in the assembly directory describing wher
 
 Setup the mandatory 'species.txt' file in the directory describing which species the data comes from. See the tests directory for an example:[species.txt](./tests/test_nonSS-trinity/species.txt)
 
-Link the transxpress-nextflow content into your assembly directory
+Symbolically link the transxpress-nextflow code into your assembly directory
 ```
 ln -s /your/transxpress-nextflow-cloned-directory/* ./
 ```
