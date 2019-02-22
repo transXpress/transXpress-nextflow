@@ -25,8 +25,9 @@ Make your assembly directory and change it to the current directory
 mkdir your_assembly_directory
 cd your_assembly_directory
 ```
-Setup the mandatory 'samples.txt' file in the directory. See the tests directory for examples
-Setup the mandatory 'species.txt' file in the directory. See the tests directory for examples
+Setup the mandatory 'samples.txt' file in the directory. See the tests directory for an example:[samples.txt](./tests/test_nonSS-trinity/samples.txt)
+
+Setup the mandatory 'species.txt' file in the directory. See the tests directory for an example:[species.txt](./tests/test_nonSS-trinity/species.txt)
 
 Link the transxpress-nextflow content into your assembly directory
 ```
