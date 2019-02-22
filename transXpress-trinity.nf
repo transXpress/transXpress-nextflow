@@ -94,7 +94,7 @@ process trinityInchwormChrysalis {
     """
     Trinity --no_distributed_trinity_exec --max_memory ${task.memory.toGiga()}G --CPU ${task.cpus} --samples_file ${relative_samples_txt} ${params.TRINITY_PARAMS}
     sleep 30 ##Try to prevent filesystem latency errors
-    chmod -R a-w ./trinity_out_dir
+    #chmod -R a-w ./trinity_out_dir
     """
 }
 
@@ -145,7 +145,7 @@ process trinityButterflyParallelVersion2 {
     ##Execute in parallel
     parallel --jobs ${task.cpus} < commands.txt
     cp commands.txt commands.completed
-    chmod -R a-w ./trinity_out_dir
+    #chmod -R a-w ./trinity_out_dir
     sleep 15 ##Try to prevent filesystem latency errors
     """ 
 }
