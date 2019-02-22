@@ -25,9 +25,9 @@ Make your assembly directory and change it to the current directory
 mkdir your_assembly_directory
 cd your_assembly_directory
 ```
-Setup the mandatory 'samples.txt' file in the directory. See the tests directory for an example:[samples.txt](./tests/test_nonSS-trinity/samples.txt)
+Setup the mandatory 'samples.txt' file in the assembly directory describing where to find your raw read FASTQ files. See the tests directory for an example:[samples.txt](./tests/test_nonSS-trinity/samples.txt)
 
-Setup the mandatory 'species.txt' file in the directory. See the tests directory for an example:[species.txt](./tests/test_nonSS-trinity/species.txt)
+Setup the mandatory 'species.txt' file in the directory describing which species the data comes from. See the tests directory for an example:[species.txt](./tests/test_nonSS-trinity/species.txt)
 
 Link the transxpress-nextflow content into your assembly directory
 ```
@@ -37,6 +37,7 @@ Execute the run.sh script with your assembler of choice, either trinity or rnasp
 ```
 ./run.sh trinity
 ```
+NextFlow only likes 1 assembly per directory, so if you'd like to run two assemblies simultaneously, you have to use different assembly directories.
 
 ## Flow
 
