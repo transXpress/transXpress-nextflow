@@ -20,6 +20,15 @@ Requires
 
 
 ## Usage
+```
+mkdir your_assembly_directory
+cd your_assembly_directory
+##Setup the mandatory 'samples.txt' file in the directory. See the tests directory for examples
+##Setup the mandatory 'species.txt' file in the directory. See the tests directory for examples
+ln -s /your/transxpress-nextflow-cloned-directory/* . ##link in all the nextflow files.
+##Execute the run.sh script with your assembler of choice, either trinity or rnaspades currently
+./run.sh trinity
+```
 
 ## Flow
 
