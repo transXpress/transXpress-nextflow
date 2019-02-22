@@ -105,7 +105,6 @@ trinityPhase1ReadPartitionsFiles_ch.flatten().map{ file ->
 					dir1String = dir1Match[0]
 					dir2String = dir2Match[0]
  
-                                        totalDir = dir1String+"/"+dir2String
                                         return tuple([dir1String,dir2String],file)
                                         }
                                         .groupTuple()
