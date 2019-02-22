@@ -2,7 +2,7 @@
 
 ASSEMBLER="trinity"
 export NXF_ANSI_LOG='false'
-GIT_DIR=$(dirname $(readlink -f ./transXpress-trinity.nf))"/.git"
+GIT_DIR=$(dirname $(readlink -f ./transXpress-$ASSEMBLER.nf))"/.git"
 GIT_HASH=$(git --git-dir=${GIT_DIR} log --pretty=format:'%H' -n 1)
 OUTFILE="transXpress-$ASSEMBLER.stdout.log"
 ERRFILE="transXpress-$ASSEMBLER.stderr.log"

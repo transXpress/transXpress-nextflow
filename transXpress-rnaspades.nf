@@ -53,17 +53,6 @@ java -jar /lab/solexa_weng/testtube/trinityrnaseq-Trinity-v2.8.4/trinity-plugins
 """
 }
 
-//Mix together all the filteredReads, and then group by their 
-//filteredPairedReads = Channel.create()
-//filteredPairedReads.mix(filteredForwardReads_ch5.collect(),filteredReverseReads_ch5.collect())
-//filteredPairedReads.map { file ->
-//        def key = file.name.toString().tokenize('_').get(0)
-//        println key
-//        return tuple(key, file)
-//     }
-//    .groupTuple()
-//    .set{ filteredPairedReadsGrouped_ch }
-
 process convertSamplesToRelative {
 input:
     file "samples.txt" from file(params.samples)
@@ -278,7 +267,6 @@ process rfamParallel {
     set rfamDb, rfamDbIndex from rfamDb
   output:
     file "rfam_out" into rfamResults
-    //file "rfam_dom_out" into rfamDomResults
   tag { assemblyPrefix+"-"+chunk }
   script:
     """
@@ -286,19 +274,19 @@ process rfamParallel {
     cmscan --incE 0.00001 --rfam --cpu ${task.cpus} --tblout rfam_out ${rfamDb} ${chunk}
     """
 }
-//rfamDomResults.collectFile(name: 'rfam_dom_annotations.txt').set { rfamDomResult }
 
 process publishRfamResults {
   publishDir "transXpress_results", mode: "copy"
   input:
     file rfamResult from rfamResults.collectFile(name: 'rfam_annotations_unsorted.txt')
   output:
-    file "rfam_annotations.txt" into rfamResultPub
+    file "rfam_annotations.txt" into rfamResultPub1
   script:
   """
+  cat ${rfamResult} |  grep -v "#" | sort -k3,3 -k15nr,15 | sort -u -k3,3 --merge | sort -k15nr,15 > rfam_annotations_sorted.txt
   cat ${rfamResult} | head -n 2 > header.txt
   cat ${rfamResult} | tail -n 9 > footer.txt
-  cat header.txt ${rfamResult} footer.txt | grep -v "#" | sort -k3,3 -k15nr,15 | sort -u -k3,3 --merge | sort -k15nr,15 > rfam_annotations.txt
+  cat header.txt rfam_annotations_sorted.txt footer.txt > rfam_annotations.txt
   """
 }
 
@@ -311,7 +299,7 @@ process transdecoderPredict {
     file blastpForTransdecoder
     file pfamForTransdecoder
   output:
-    file "${transcriptomeTransdecoderPredict}.transdecoder.pep" into predictProteome, predictProteomeSplit //This seems a bit weird. Referring to it indirectly, rather than directly
+    file "${transcriptomeTransdecoderPredict}.transdecoder.pep" into predictProteome, predictProteomeSplitBy100,predictProteomeSplitBy10 //This seems a bit weird. Referring to it indirectly, rather than directly
     file "${transcriptomeTransdecoderPredict}.transdecoder.*"
   script:
     """
@@ -319,9 +307,13 @@ process transdecoderPredict {
     """
 }
 
-predictProteomeSplit
+predictProteomeSplitBy100
   .splitFasta(by: 100, file: true)
-  .into { signalpChunks; tmhmmChunks ; deeplocChunks}
+  .into { signalpChunks; tmhmmChunks }
+
+predictProteomeSplitBy10
+  .splitFasta(by: 10, file: true)
+  .set{deeplocChunks}
 
 process signalpParallel {
   cpus 1
@@ -340,7 +332,7 @@ signalpResults.collectFile(name: 'signalp_annotations.txt').set { signalpResult 
 
 
 process deeplocParallel {
-
+  maxForks 11 //DELETE_THIS_AFTER_TESTING
   input:
     file chunk from deeplocChunks
   output:

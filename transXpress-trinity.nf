@@ -422,7 +422,7 @@ process transdecoderPredict {
     file blastpForTransdecoder
     file pfamForTransdecoder
   output:
-    file "${transcriptomeTransdecoderPredict}.transdecoder.pep" into predictProteome, predictProteomeSplit //This seems a bit weird. Referring to it indirectly, rather than directly
+    file "${transcriptomeTransdecoderPredict}.transdecoder.pep" into predictProteome, predictProteomeSplitBy100,predictProteomeSplitBy10 //This seems a bit weird. Referring to it indirectly, rather than directly
     file "${transcriptomeTransdecoderPredict}.transdecoder.*"
   script:
     """
@@ -430,12 +430,16 @@ process transdecoderPredict {
     """
 }
 
-predictProteomeSplit
+predictProteomeSplitBy100
   .splitFasta(by: 100, file: true)
-  .into { deeplocChunks; tmhmmChunks }
+  .set { tmhmmChunks }
+
+predictProteomeSplitBy10
+  .splitFasta(by: 10, file: true)
+  .set{ deeplocChunks }
 
 process deeplocParallel {
-
+  maxForks 11 //DELETE WHEN DONE TESTING
   input:
     file chunk from deeplocChunks
   output:
