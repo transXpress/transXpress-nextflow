@@ -128,7 +128,7 @@ process renameAssembly {
    input: 
     file spadesAssembly_ch
    output:
-    file assemblyPrefix+".fasta" into transcriptomeKallisto, transcriptomeTransdecoder, transcriptomeTransdecoderPredict, transcriptomeStats, transcriptomeTransrate, transcriptomeSplit, transcriptomeAnnotation
+    file assemblyPrefix+".fasta" into transcriptomeKallisto, transcriptomeTransdecoder, transcriptomeTransdecoderPredict, transcriptomeStats, transcriptomeSplit, transcriptomeAnnotation
 
    script:
    """

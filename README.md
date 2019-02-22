@@ -20,3 +20,8 @@ Requires
 
 
 ## Usage
+
+## Flow
+
+rnaSPAdes
+![Directed acyclic graph for program execution](./tests/test_nonSS-rnaspades/test_nonSS_dag.svg)
