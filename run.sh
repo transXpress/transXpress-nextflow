@@ -1,13 +1,17 @@
 #!/bin/bash
 
+ASSEMBLER=$1
+export NXF_ANSI_LOG='false'
 GIT_DIR=$(dirname $(readlink -f ./transXpress.nf))"/.git"
 GIT_HASH=$(git --git-dir=${GIT_DIR} log --pretty=format:'%H' -n 1)
-echo "$(date)" | tee -a transXpress.stdout.log
-echo "transXpress now running. git hash: "${GIT_HASH} | tee -a transXpress.stdout.log
-/lab/weng_scratch/Tomas/nextflow/nextflow/launch.sh run transXpress.nf -resume 1>>transXpress.stdout.log 2>>transXpress.stderr.log &
+OUTFILE="transXpress-$ASSEMBLER.stdout.log"
+ERRFILE="transXpress-$ASSEMBLER.stderr.log"
+echo "$(date)" | tee -a $OUTFILE
+echo "transXpress now running. git hash: "${GIT_HASH} | tee -a $OUTFILE
+echo "Logs are being written to $OUTFILE and $ERRFILE in the current directory" | tee -a $OUTFILE
+echo "Try 'lsof $OUTFILE' if you need to get the process id of the nextflow manager" | tee -a $OUTFILE
+echo "transXpress dropping to background on host "$HOSTNAME"..." | tee -a $OUTFILE
+/lab/solexa_weng/testtube/nextflow/nextflow-19.02.0-edge-all run transXpress-$ASSEMBLER.nf -w work-$ASSEMBLER --samples 'samples.txt' -profile test_nonSS -resume 1>>$OUTFILE 2>$ERRFILE &
 disown
-echo "transXpress dropping to background on host "$HOSTNAME"..." | tee -a transXpress.stdout.log
-echo "Logs are being written to transXpress.stdout.log and transXpress.stderr.log in the current directory" | tee -a transXpress.stdout.log
-echo "Try 'lsof transXpress.stdout.log' if you need to get the process id of the nextflow manager" | tee -a transXpress.stdout.log
 
 
