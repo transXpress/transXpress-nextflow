@@ -53,24 +53,6 @@ java -jar /lab/solexa_weng/testtube/trinityrnaseq-Trinity-v2.8.4/trinity-plugins
 """
 }
 
-process convertSamplesToRelative {
-input:
-    file "samples.txt" from file(params.samples)
-output:
-    file "relative_samples.txt" into relative_samples_txt_ch
-
-script:
-"""
-while read LINE; do
-  START=\$(echo "\$LINE" | cut -f 1,2)
-  FORWARD=\$(echo "\$LINE" | cut -f 3 | sed -r 's/[\\/\\.].+\\///g')".R1-P.qtrim.fastq.gz"
-  REVERSE=\$(echo "\$LINE" | cut -f 4 | sed -r 's/[\\/\\.].+\\///g')".R2-P.qtrim.fastq.gz"
-  echo \$FORWARD \$REVERSE
-  echo "\${START}\t\${FORWARD}\t\${REVERSE}" >> relative_samples.txt
-done < samples.txt
-"""
-}
-relative_samples_txt_ch.into{ relative_samples_txt_ch1; relative_samples_txt_ch2; relative_samples_txt_ch3; relative_samples_txt_ch4}
 
 process convertReadsToYAML {
 
@@ -128,7 +110,7 @@ process renameAssembly {
    input: 
     file spadesAssembly_ch
    output:
-    file assemblyPrefix+".fasta" into transcriptomeKallisto, transcriptomeTransdecoder, transcriptomeTransdecoderPredict, transcriptomeStats, transcriptomeSplit, transcriptomeAnnotation
+    file assemblyPrefix+".fasta" into transcriptomeKallisto, transcriptomeTransdecoder, transcriptomeTransdecoderPredict, transcriptomeSplit, transcriptomeAnnotation
 
    script:
    """

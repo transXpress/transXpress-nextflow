@@ -43,17 +43,13 @@ input:
  set file(R1_reads),file(R2_reads) from readPairs_ch
 tag {"$R1_reads"+" and " +"$R2_reads"}
 output:
-  file "${R1_reads}.R1-P.qtrim.fastq.gz" into filteredForwardReads_ch
-  file "${R2_reads}.R2-P.qtrim.fastq.gz" into filteredReverseReads_ch
-  file "*U.qtrim.fastq.gz" into filteredSingleReads_ch1,filteredSingleReads_ch2
+  set file("${R1_reads}.R1-P.qtrim.fastq.gz"), file("${R2_reads}.R2-P.qtrim.fastq.gz") into filteredPairedReads_ch1,filteredPairedReads_ch2,filteredPairedReads_ch3
+  file "*U.qtrim.fastq.gz" into filteredSingleReads
 script:
 """
 java -jar /lab/solexa_weng/testtube/trinityrnaseq-Trinity-v2.8.4/trinity-plugins/Trimmomatic/trimmomatic.jar PE -threads ${task.cpus}  ${R1_reads} ${R2_reads} ${R1_reads}.R1-P.qtrim.fastq.gz ${R1_reads}.R1-U.qtrim.fastq.gz ${R2_reads}.R2-P.qtrim.fastq.gz ${R2_reads}.R2-U.qtrim.fastq.gz  ILLUMINACLIP:/lab/solexa_weng/testtube/trinityrnaseq-Trinity-v2.8.4/trinity-plugins/Trimmomatic/adapters/TruSeq3-PE.fa:2:30:10 SLIDINGWINDOW:4:5 LEADING:5 TRAILING:5 MINLEN:25 
 """
 }
-filteredForwardReads_ch.into{ filteredForwardReads_ch1; filteredForwardReads_ch2; filteredForwardReads_ch3; filteredForwardReads_ch4; filteredForwardReads_ch5 }
-filteredReverseReads_ch.into{ filteredReverseReads_ch1; filteredReverseReads_ch2; filteredReverseReads_ch3; filteredReverseReads_ch4; filteredReverseReads_ch5 }
-
 
 process convertSamplesToRelative {
 input:
@@ -74,38 +70,9 @@ done < samples.txt
 }
 relative_samples_txt_ch.into{ relative_samples_txt_ch1; relative_samples_txt_ch2; relative_samples_txt_ch3; relative_samples_txt_ch4}
 
-process convertReadsToYAML {
-
-input:
-  file forwardReads from filteredForwardReads_ch1.collect()
-  file reverseReads from filteredReverseReads_ch1.collect()
-  file unpairedReads from filteredSingleReads_ch1.collect()
-output:
-  file "datasets.yaml" into datasets_YAML_ch
-script:
-"""
-   echo "[{
-        orientation: "fr",
-        type: "paired-end",
-        right reads: [" >datasets.yaml
-   ls -1 ./*.R1-P.qtrim.fastq.gz | sed 's/^/\\"/g' | sed 's/\$/\\"/g' | sed 's/@\"/\\"/g' | tr "\\n" "," | sed 's/,\$//g' >>datasets.yaml
-   echo "]," >> datasets.yaml
-   echo "left reads: [" >> datasets.yaml
-   ls -1 ./*.R2-P.qtrim.fastq.gz | sed 's/^/\\"/g' | sed 's/\$/\\"/g' | sed 's/@\"/\\"/g' | tr "\\n" "," | sed 's/,\$//g' >>datasets.yaml
-   echo "]
-      }," >>datasets.yaml
-   echo "{
-        type: "single",
-        single reads: [" >> datasets.yaml
-   ls -1 ./*U.qtrim.fastq.gz | sed 's/^/\\"/g' | sed 's/\$/\\"/g' | sed 's/@\"/\\"/g' | tr "\\n" "," | sed 's/,\$//g' >>datasets.yaml
-   echo "]}]" >> datasets.yaml
-"""  
-}
-
 process trinityInchwormChrysalis {
-  echo = true
+  cache 'lenient'
   label = "nf_"+assemblyPrefix+"_trinityInchwormChrysalis"
-  stageInMode="copy" 
 
   cpus 12
   memory "200 GB"
@@ -115,64 +82,87 @@ process trinityInchwormChrysalis {
   afterScript 'echo \"(Above completion message is from Trinity. transXpress will continue the pipeline execution.)\"'
   //afterScript 'exit(1)'
   input:
-    file filteredForwardReads from filteredForwardReads_ch2.collect()
-    file filteredReverseReads from filteredReverseReads_ch2.collect()
+    file filteredReadsFromPairs from filteredPairedReads_ch1.collect() //This flattens the tuple
     file relative_samples_txt from relative_samples_txt_ch1
   output:
-    //These commented out lines load all the files into channels.
-    //file "./trinity_out_dir/*.fa" into trinityPhase1RootFiles_ch1
-    //file "./trinity_out_dir/*.ok" into trinityPhase1RootFiles_ch2
-    //file "./trinity_out_dir/*.read_count" into trinityPhase1RootFiles_ch3
-    //file "./trinity_out_dir/*.kmer_count" into trinityPhase1RootFiles_ch4
-    //file "./trinity_out_dir/*.histo" into trinityPhase1RootFiles_ch5
-    //file "./trinity_out_dir/*.cmds" into trinityPhase1RootFiles_ch6
-    //file "./trinity_out_dir/*.timing" into trinityPhase1RootFiles_ch7
-    //file "./trinity_out_dir/*.sam" into trinityPhase1RootFiles_ch8
-    //file "./trinity_out_dir/chrysalis/*.fasta" into trinityPhase1ChrysalisFiles_ch1
-    //file "./trinity_out_dir/chrysalis/*.ok" into trinityPhase1ChrysalisFiles_ch2
-    //file "./trinity_out_dir/chrysalis/*.out" into trinityPhase1ChrysalisFiles_ch3
-    //file "./trinity_out_dir/chrysalis/*.min100" into trinityPhase1ChrysalisFiles_ch4
-    //file "./trinity_out_dir/chrysalis/*.bt2" into trinityPhase1ChrysalisFiles_ch5
-    //file "./trinity_out_dir/chrysalis/*.bam" into trinityPhase1ChrysalisFiles_ch6
-    //file "./trinity_out_dir/chrysalis/*.sorted" into trinityPhase1ChrysalisFiles_ch7
-    //file "./trinity_out_dir/chrysalis/*.txt" into trinityPhase1ChrysalisFiles_ch8
-    //file "./trinity_out_dir/chrysalis/*.wIwormNames" into trinityPhase1ChrysalisFiles_ch9
-    //file "./trinity_out_dir/chrysalis/*.sort" into trinityPhase1ChrysalisFiles_ch10
-    //file "./trinity_out_dir/read_partitions/*/*/*.trinity.reads.fa" trinityPhase1ReadPartitionsFiles_ch
     file "./trinity_out_dir" into trinityWorkDir
-    file "./trinity_out_dir/recursive_trinity.cmds" into trinityCmds
+    //These commented out lines load all the files into channels.
+    file "trinity_out_dir/[!Tcr]*" into trinityWorkDirRootFiles_ch1, trinityWorkDirRootFiles_ch2 //Not files starting with c or r, so not chrysalis, read_partitions, recursive trinity cmds, Trinity.timing
+    file "trinity_out_dir/chrysalis/*" into trinityWorkDirChrysalisFiles_ch1, trinityWorkDirChrysalisFiles_ch2
+    file "trinity_out_dir/read_partitions/Fb*/C*/*.trinity.reads.fa" into trinityPhase1ReadPartitionsFiles_ch,fastaClusterFile
+    //
 
   script:
     """
     Trinity --no_distributed_trinity_exec --max_memory ${task.memory.toGiga()}G --CPU ${task.cpus} --samples_file ${relative_samples_txt} ${params.TRINITY_PARAMS}
+    sleep 30 ##Try to prevent filesystem latency errors
+    chmod -R a-w ./trinity_out_dir
     """
 }
 
-process trinityButterflyParallel {
+trinityPhase1ReadPartitionsFiles_ch.flatten().map{ file ->
+                                        def filePath = file.toAbsolutePath().toString()
+                                        dir1Match = filePath =~ /Fb_[0-9]+/ ///Regex matching
+                                        dir2Match = filePath =~ /CBin_[0-9]+/ ///Regex matching
+					dir1String = dir1Match[0]
+					dir2String = dir2Match[0]
+ 
+                                        totalDir = dir1String+"/"+dir2String
+                                        return tuple([dir1String,dir2String],file)
+                                        }
+                                        .groupTuple()
+                                        .set{ groups_ch }
+	//Add .groupTuple() to execute in groups by the directories
+
+process trinityButterflyParallelVersion2 {
+  cache 'lenient'
+  cpus 10
   input:
-  //  file trinityWorkDir
-    file parallelCommand from trinityCmds.splitText(by: 10, file: "trinityCmd")
+    file "trinity_out_dir/*" from trinityWorkDirRootFiles_ch1 //An attempt to relativize the butterfly processes
+    file "trinity_out_dir/chrysalis/*" from trinityWorkDirChrysalisFiles_ch1 //An attempt to relativize the butterfly processes
+    set dir,file(fastaFiles) from groups_ch
+    
   output:
-    file "${parallelCommand}.completed" into trinityFinishedCmds
-  tag { assemblyPrefix+"-"+parallelCommand }
+   file "commands.completed" into trinityFinishedCmds
+   file "commands.txt" into trinityCmds
+   file "trinity_out_dir/read_partitions/*/*/*out.Trinity.fasta" into butterflyTrinityFiles
+  tag { assemblyPrefix+"-"+dir[0]+"/"+dir[1]}
   script:
     """
-    sh ${parallelCommand}
-    cp ${parallelCommand} ${parallelCommand}.completed
+    ##Have to recreate the directory structure for the read_parition files
+    mkdir "trinity_out_dir/read_partitions"
+    mkdir "trinity_out_dir/read_partitions/${dir[0]}"
+    mkdir "trinity_out_dir/read_partitions/${dir[0]}/${dir[1]}"
+    for f in ./*.fa
+    do
+     ##Once the directory structure is made, link the FASTA file back into it.
+     ##Note the dollar sign escaping for nextflow
+     ln -s "../../../../\$f" "trinity_out_dir/read_partitions/${dir[0]}/${dir[1]}/\$f"
+    done
+    for f in ./trinity_out_dir/read_partitions/${dir[0]}/${dir[1]}/*.fa
+    do
+     ##Make our own Trinity commands, using relative paths
+     echo "Trinity --single '\$f' --output '\$f.out' --CPU 1 --max_memory 1G --run_as_paired --seqType fa --trinity_complete --full_cleanup --no_distributed_trinity_exec --min_glue 2 --min_kmer_cov 10" >> commands.txt
+    done
+    ##Execute in parallel
+    parallel --jobs ${task.cpus} < commands.txt
+    cp commands.txt commands.completed
+    chmod -R a-w ./trinity_out_dir
+    sleep 15 ##Try to prevent filesystem latency errors
     """ 
 }
+
 
 process trinityFinish {
    publishDir "transXpress_results", mode: "copy", saveAs: { filename -> filename.replaceAll("trinity_out_dir/Trinity", "transcriptome") }
   input:
-    //file "./trinity_out_dir/*" from trinityPhase1RootFiles_ch1.mix(trinityPhase1RootFiles_ch2,trinityPhase1RootFiles_ch3,trinityPhase1RootFiles_ch4,trinityPhase1RootFiles_ch5,trinityPhase1RootFiles_ch6,trinityPhase1RootFiles_ch7,trinityPhase1RootFiles_ch8).collect()
-    //file "./trinity_out_dir/chrysalis/*" from trinityPhase1ChrysalisFiles_ch1.mix(trinityPhase1ChrysalisFiles_ch2,trinityPhase1ChrysalisFiles_ch3,trinityPhase1ChrysalisFiles_ch4,trinityPhase1ChrysalisFiles_ch5,trinityPhase1ChrysalisFiles_ch6,trinityPhase1ChrysalisFiles_ch7,trinityPhase1ChrysalisFiles_ch8,trinityPhase1ChrysalisFiles_ch9,trinityPhase1ChrysalisFiles_ch10).collect()
-    //file "trinity_out_dir/read_partitions/*/*/*.trinity.reads.fa" from trinityPhase1ChrysalisFiles_ch
-    file trinityWorkDir
+    file "trinity_out_dir/*" from trinityWorkDirRootFiles_ch2 //An attempt to relativize the butterfly processes
+    file "trinity_out_dir/chrysalis/*" from trinityWorkDirChrysalisFiles_ch2 //An attempt to relativize the butterfly processes
+    file butterflyTrinityFilesCollected from butterflyTrinityFiles.collect() 
     file relative_samples_txt from relative_samples_txt_ch2
     file finishedCommands from trinityFinishedCmds.collectFile(name: "recursive_trinity.cmds.completed")
-    file filteredForwardReads from filteredForwardReads_ch3.collect()
-    file filteredReverseReads from filteredReverseReads_ch3.collect()
+    file trinityCmdsCollected from trinityCmds.collectFile(name: "recursive_trinity.cmds")
+    file filteredReads from filteredPairedReads_ch2.collect() //This flattens the tuple
   output:
     file "./trinity_out_dir/Trinity.fasta.gene_trans_map" into originalGeneTransMap
     file "./trinity_out_dir/Trinity.fasta" into Trinity_fasta_ch
@@ -181,7 +171,18 @@ process trinityFinish {
   tag { assemblyPrefix }
   script:
     """
-    cp ${finishedCommands} ${trinityWorkDir}/recursive_trinity.cmds.completed
+    mkdir trinity_out_dir/read_partitions/
+    mkdir trinity_out_dir/read_partitions/Fb_0/
+    mkdir trinity_out_dir/read_partitions/Fb_0/CBin_0 ##This is just a dummy directory to fool Trinity
+    for f in ./*.fasta
+    do
+     ##Link the files into a directory structure that Trinity can deal with correctly, even if it isn't 100% right
+     ln -s ../../../../\$f trinity_out_dir/read_partitions/Fb_0/CBin_0/
+    done
+    ##Have to produce these files to trick Trinity into thinking things are done
+    cp ${trinityCmdsCollected} trinity_out_dir/recursive_trinity.cmds
+    cp ${finishedCommands} trinity_out_dir/recursive_trinity.cmds.completed
+    touch trinity_out_dir/recursive_trinity.cmds.ok
     Trinity --samples_file ${relative_samples_txt} --max_memory ${task.memory.toGiga()}G ${params.TRINITY_PARAMS}
     """ 
 }
@@ -189,7 +190,7 @@ process trinityFinish {
 process renameTrinityAssembly {
    publishDir "transXpress_results", mode: "copy"
    tag { assemblyPrefix }
-   input: 
+   input:
     file "Trinity.fasta" from Trinity_fasta_ch
     file "species.txt" from file(params.species) //Just a dummy input
     file "Trinity.fasta.gene_trans_map" from originalGeneTransMap
@@ -223,8 +224,7 @@ process kallisto {
   cpus 10
   tag { assemblyPrefix }
   input:
-    file forwardReads from filteredForwardReads_ch5.collect()
-    file reverseReads from filteredReverseReads_ch5.collect()
+    file filteredReadsFromPairs from filteredPairedReads_ch3.collect() //This flattens the tuples
     file transcriptomeKallisto
     file geneTransMap
     file relative_samples_txt from relative_samples_txt_ch4
