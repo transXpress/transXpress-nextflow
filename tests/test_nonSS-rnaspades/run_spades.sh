@@ -1,3 +1,3 @@
 #! /bin/bash
 
-../../run.sh "rnaspades"
+../../run.sh "rnaspades" "test_nonSS"

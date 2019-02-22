@@ -1,5 +1,5 @@
 #! /bin/bash
 
-../../run.sh "trinity"
+../../run.sh "trinity" "test_nonSS"
 
 
