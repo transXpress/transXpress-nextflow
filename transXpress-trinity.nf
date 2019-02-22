@@ -68,7 +68,7 @@ while read LINE; do
 done < samples.txt
 """
 }
-relative_samples_txt_ch.into{ relative_samples_txt_ch1; relative_samples_txt_ch2; relative_samples_txt_ch3; relative_samples_txt_ch4}
+relative_samples_txt_ch.into{ relative_samples_txt_ch1; relative_samples_txt_ch2; relative_samples_txt_ch3}
 
 process trinityInchwormChrysalis {
   cache 'lenient'
@@ -85,11 +85,9 @@ process trinityInchwormChrysalis {
     file filteredReadsFromPairs from filteredPairedReads_ch1.collect() //This flattens the tuple
     file relative_samples_txt from relative_samples_txt_ch1
   output:
-    file "./trinity_out_dir" into trinityWorkDir
-    //These commented out lines load all the files into channels.
     file "trinity_out_dir/[!Tcr]*" into trinityWorkDirRootFiles_ch1, trinityWorkDirRootFiles_ch2 //Not files starting with c or r, so not chrysalis, read_partitions, recursive trinity cmds, Trinity.timing
     file "trinity_out_dir/chrysalis/*" into trinityWorkDirChrysalisFiles_ch1, trinityWorkDirChrysalisFiles_ch2
-    file "trinity_out_dir/read_partitions/Fb*/C*/*.trinity.reads.fa" into trinityPhase1ReadPartitionsFiles_ch,fastaClusterFile
+    file "trinity_out_dir/read_partitions/Fb*/C*/*.trinity.reads.fa" into trinityPhase1ReadPartitionsFiles_ch
     //
 
   script:
@@ -227,7 +225,7 @@ process kallisto {
     file filteredReadsFromPairs from filteredPairedReads_ch3.collect() //This flattens the tuples
     file transcriptomeKallisto
     file geneTransMap
-    file relative_samples_txt from relative_samples_txt_ch4
+    file relative_samples_txt from relative_samples_txt_ch3
   output:
     file "kallisto.isoform.TPM.not_cross_norm" into rawKallistoTable
     file "kallisto.isoform.TMM.EXPR.matrix" optional true into normalizedKallistoTable
