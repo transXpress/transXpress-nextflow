@@ -113,6 +113,7 @@ trinityPhase1ReadPartitionsFiles_ch.flatten().map{ file ->
 	//Add .groupTuple() to execute in groups by the directories
 
 process trinityButterflyParallelVersion2 {
+  //Note! This process has hardcoded parameters.  It should really be getting them from the TRINITY params...
   cache 'lenient'
   cpus 10
   input:
@@ -140,7 +141,7 @@ process trinityButterflyParallelVersion2 {
     for f in ./trinity_out_dir/read_partitions/${dir[0]}/${dir[1]}/*.fa
     do
      ##Make our own Trinity commands, using relative paths
-     echo "Trinity --single '\$f' --output '\$f.out' --CPU 1 --max_memory 1G --run_as_paired --seqType fa --trinity_complete --full_cleanup --no_distributed_trinity_exec --min_glue 2 --min_kmer_cov 10" >> commands.txt
+     echo "Trinity --single '\$f' --output '\$f.out' --CPU 1 --max_memory 1G --run_as_paired --seqType fa --trinity_complete --full_cleanup --no_distributed_trinity_exec --min_glue 2 --min_kmer_cov 2" >> commands.txt
     done
     ##Execute in parallel
     parallel --jobs ${task.cpus} < commands.txt
