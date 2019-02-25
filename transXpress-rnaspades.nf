@@ -35,13 +35,6 @@ Channel.fromPath(params.samples)
      return tuple(file(row[2]), file(row[3])) }
      .into{ readPairs_ch ; readPairs_ch2 }
 
-readPairs_ch2
-       .map{ item ->
-       item0 = '\"'+item[0]+'\"' //Double quoting the string
-       item1 = '\"'+item[1]+'\"' //Double quoting the string
-       return tuple(item0,item1) }
-       .set{ readPairsQuoted_ch1 }
-
 process trimmomatic {
 
 cpus 4
@@ -57,6 +50,12 @@ java -jar /lab/solexa_weng/testtube/trinityrnaseq-Trinity-v2.8.4/trinity-plugins
 """
 }
 
+readPairs_ch2
+       .map{ item ->
+       item0 = '\"'+item[0]+'\"' //Double quoting the string
+       item1 = '\"'+item[1]+'\"' //Double quoting the string
+       return tuple(item0,item1) }
+       .set{ readPairsQuoted_ch1 }
 
 process convertReadsToYAML {
 input:
@@ -68,34 +67,37 @@ output:
 script:
     """
     #!/usr/bin/env python
+    import os
+    import os.path
     import glob
     import pprint
-    
-    readPairs = ${readPairTuples} ##Little bit of hackery. Since groovy and python are similar, quoting the string values in the groovy datastructure makes a python datastructure
-    
+
+    ##Little bit of hackery. Since groovy and python are similar, quoting the string values in the groovy datastructure makes a python datastructure
+    readPairs = ${readPairTuples}
+ 
     sample_list = []
     for p in readPairs:
         f = p[0].split("/")[-1:][0] ##Just want the last part of the path.
         r = p[1].split("/")[-1:][0] ##Just want the last part of the path.
-        assert len(glob.glob(f+"*.R1-P.qtrim.fastq.gz")) == 1
-        assert len(glob.glob(r+"*.R2-P.qtrim.fastq.gz")) == 1
-        f_trimmed = glob.glob(f+"*.R1-P.qtrim.fastq.gz") ##Use the last part of the path to find the trimmed version
-        r_trimmed = glob.glob(r+"*.R2-P.qtrim.fastq.gz") ##Use the last part of the path to find the trimmed version
+        f_trimmed = f+".R1-P.qtrim.fastq.gz" ##Could also add this in the readPairsQuoted mapping function
+        r_trimmed = r+".R2-P.qtrim.fastq.gz"
+        assert os.path.isfile(f_trimmed)
+        assert os.path.isfile(r_trimmed)
         sample_dict = dict()
         sample_dict['orientation'] = 'fr'
         sample_dict['type'] = 'paired-end'
-        sample_dict['right reads'] = f_trimmed
-        sample_dict['left reads'] = r_trimmed
+        sample_dict['right reads'] = [f_trimmed]
+        sample_dict['left reads'] = [r_trimmed]
+        unpaired_reads_f = glob.glob(f+"*U.qtrim.fastq.gz")
+        unpaired_reads_r = glob.glob(r+"*U.qtrim.fastq.gz")
+
+        if len(unpaired_reads_f + unpaired_reads_r) > 0:
+            sample_dict['single reads'] = unpaired_reads_f + unpaired_reads_r
+        
         sample_list.append(sample_dict)
 
-    unpaired_reads = glob.glob("*U.qtrim.fastq.gz")
-
-    for u in unpaired_reads:
-         sample_dict = dict()
-         sample_dict['type'] = 'single'
-         sample_dict['single reads'] = [u]
-         sample_list.append(sample_dict)
     handle = open("datasets.yaml","w")
+    ##As far as I can tell, the SPAdes "YAML" format matches the python datastructure notation, so just export as python
     handle.write(pprint.pformat(sample_list))
     handle.close()
     """  
