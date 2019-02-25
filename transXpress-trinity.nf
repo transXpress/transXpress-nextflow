@@ -108,7 +108,7 @@ trinityPhase1ReadPartitionsFiles_ch.flatten().map{ file ->
                                         return tuple([dir1String,dir2String],file)
                                         }
                                         .groupTuple()
-                                        .set{ groups_ch }
+                                        .set{ partitionedReadGroups_ch }
 	//Add .groupTuple() to execute in groups by the directories
 
 process trinityButterflyParallelVersion2 {
@@ -118,7 +118,7 @@ process trinityButterflyParallelVersion2 {
   input:
     file "trinity_out_dir/*" from trinityWorkDirRootFiles_ch1 //An attempt to relativize the butterfly processes
     file "trinity_out_dir/chrysalis/*" from trinityWorkDirChrysalisFiles_ch1 //An attempt to relativize the butterfly processes
-    set dir,file(fastaFiles) from groups_ch
+    set dir,file(fastaFiles) from partitionedReadGroups_ch
     
   output:
    file "commands.completed" into trinityFinishedCmds
