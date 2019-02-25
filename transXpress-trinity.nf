@@ -43,13 +43,18 @@ input:
  set file(R1_reads),file(R2_reads) from readPairs_ch
 tag {"$R1_reads"+" and " +"$R2_reads"}
 output:
-  set file("${R1_reads}.R1-P.qtrim.fastq.gz"), file("${R2_reads}.R2-P.qtrim.fastq.gz") into filteredPairedReads_ch1,filteredPairedReads_ch2,filteredPairedReads_ch3
+  set file("${R1_reads}.R1-P.qtrim.fastq.gz"), file("${R2_reads}.R2-P.qtrim.fastq.gz") into filteredPairedReads_toChoice,filteredPairedReads_toKallisto
   file "*U.qtrim.fastq.gz" into filteredSingleReads
 script:
 """
 java -jar /lab/solexa_weng/testtube/trinityrnaseq-Trinity-v2.8.4/trinity-plugins/Trimmomatic/trimmomatic.jar PE -threads ${task.cpus}  ${R1_reads} ${R2_reads} ${R1_reads}.R1-P.qtrim.fastq.gz ${R1_reads}.R1-U.qtrim.fastq.gz ${R2_reads}.R2-P.qtrim.fastq.gz ${R2_reads}.R2-U.qtrim.fastq.gz  ILLUMINACLIP:/lab/solexa_weng/testtube/trinityrnaseq-Trinity-v2.8.4/trinity-plugins/Trimmomatic/adapters/TruSeq3-PE.fa:2:30:10 SLIDINGWINDOW:4:5 LEADING:5 TRAILING:5 MINLEN:25 
 """
 }
+filteredPairedReads_toTrinity = Channel.create()
+filteredPairedReads_toRnaspades = Channel.create()
+filteredPairedReads_toChoice.choice(filteredPairedReads_toTrinity,filteredPairedReads_toRnaspades) { "trinity" =~ /rinity/ ? 0 : 1 }
+
+filteredPairedReads_toTrinity.collect().into{ trinityInchwormPairedReads ; trinityFinishPairedReads }
 
 process convertSamplesToRelative {
 input:
@@ -83,7 +88,7 @@ process trinityInchwormChrysalis {
   afterScript 'echo \"(Above completion message is from Trinity. transXpress will continue the pipeline execution.)\"'
   //afterScript 'exit(1)'
   input:
-     file filteredReadsFromPairs from filteredPairedReads_ch1.collect() //This flattens the tuple
+     file trinityInchwormPairedReads //This flattens the tuple
      file samples_file from relative_samples_txt_ch1
   output:
     file "trinity_out_dir/[!Tcr]*" into trinityWorkDirRootFiles_ch1, trinityWorkDirRootFiles_ch2 //Not files starting with c or r, so not chrysalis, read_partitions, recursive trinity cmds, Trinity.timing
@@ -161,7 +166,7 @@ process trinityFinish {
     file relative_samples_txt from relative_samples_txt_ch2
     file finishedCommands from trinityFinishedCmds.collectFile(name: "recursive_trinity.cmds.completed")
     file trinityCmdsCollected from trinityCmds.collectFile(name: "recursive_trinity.cmds")
-    file filteredReads from filteredPairedReads_ch2.collect() //This flattens the tuple
+    file trinityFinishPairedReads
   output:
     file "./trinity_out_dir/Trinity.fasta.gene_trans_map" into originalGeneTransMap
     file "./trinity_out_dir/Trinity.fasta" into Trinity_fasta_ch
@@ -186,6 +191,25 @@ process trinityFinish {
     """ 
 }
 
+/*
+process runSPAdes {
+cpus 16
+memory "200 GB"
+
+input:
+   file filteredPairedReads from filteredPairedReads_toRnaspades.collect()
+   file datasets_YAML from XXX
+   //file filteredSingleReads from filteredSingleReads_ch2.collect()
+output:
+   file assemblyPrefix+"/transcripts.fasta" into spadesAssembly_ch
+
+script:
+"""
+rnaspades.py --dataset ${datasets_YAML} -t ${task.cpus} -m ${task.memory.toGiga()} --fast -o ${assemblyPrefix} --only-assembler -k 47
+"""
+}
+*/
+
 process renameTrinityAssembly {
    publishDir "transXpress_results", mode: "copy"
    tag { assemblyPrefix }
@@ -194,7 +218,7 @@ process renameTrinityAssembly {
     file "species.txt" from file(params.species) //Just a dummy input
     file "Trinity.fasta.gene_trans_map" from originalGeneTransMap
    output:
-    file assemblyPrefix+".fasta" into transcriptomeKallisto, transcriptomeTransdecoder, transcriptomeTransdecoderPredict, transcriptomeStats, transcriptomeSplit, transcriptomeAnnotation
+    file assemblyPrefix+".fasta" into transcriptomeKallisto, transcriptomeTransdecoder, transcriptomeStats, transcriptomeSplit, transcriptomeAnnotation
     file "Trinity_renamed.fasta.gene_trans_map" into geneTransMap
 
    script:
@@ -210,11 +234,15 @@ process transdecoderLongOrfs {
   input:
     file transcriptomeTransdecoder
   output:
-    file "${transcriptomeTransdecoder}.transdecoder_dir/longest_orfs.pep" into longOrfsProteomeSplit
-    file "${transcriptomeTransdecoder}.transdecoder_dir" into transdecoderWorkDir
+    file "${transcriptomeTransdecoder}.transdecoder_dir/*.pep" into longOrfsProteomeSplit
+    file "${transcriptomeTransdecoder}.transdecoder_dir/*" into transdecoderLongOrfsDirFiles
+    file "${transcriptomeTransdecoder}.transdecoder_dir.__checkpoints_longorfs/*" into longOrfsCheckpointsFiles
+    file "*.cmds" into longOrfsRootCmds
+    set val("${transcriptomeTransdecoder}"), file(transcriptomeTransdecoder) into transcriptomeTransdecoderPredict
   script:
     """
     TransDecoder.LongOrfs -t ${transcriptomeTransdecoder}
+    chmod -R a-w ${transcriptomeTransdecoder}.transdecoder_dir/ ##write protect the output to troubleshoot downstream accessing.
     """
 }
 
@@ -223,7 +251,7 @@ process kallisto {
   cpus 10
   tag { assemblyPrefix }
   input:
-    file filteredReadsFromPairs from filteredPairedReads_ch3.collect() //This flattens the tuples
+    file filteredReadsFromPairs from filteredPairedReads_toKallisto.collect() //This flattens the tuples
     file transcriptomeKallisto
     file geneTransMap
     file relative_samples_txt from relative_samples_txt_ch3
@@ -404,6 +432,7 @@ process publishRfamResults {
     file rfamResult from rfamResults.collectFile(name: 'rfam_annotations_unsorted.txt')
   output:
     file "rfam_annotations.txt" into rfamResultPub
+  tag { assemblyPrefix }
   script:
   """
   cat ${rfamResult} | head -n 2 > header.txt
@@ -416,16 +445,17 @@ process transdecoderPredict {
   publishDir "transXpress_results", mode: "copy" // , saveAs: { filename -> "transcriptome_after_predict.pep" }
   tag { assemblyPrefix }
   input:
-    file transdecoderWorkDir
-    file transcriptomeTransdecoderPredict
+    set val(transcriptomeName),file(transcriptomeFile) from transcriptomeTransdecoderPredict
+    file "${transcriptomeName}.transdecoder_dir/*" from transdecoderLongOrfsDirFiles
+    file "${transcriptomeName}.transdecoder_dir.__checkpoints_longorfs/*" from longOrfsCheckpointsFiles
+    file longOrfsRootCmds 
     file blastpForTransdecoder
     file pfamForTransdecoder
   output:
-    file "${transcriptomeTransdecoderPredict}.transdecoder.pep" into predictProteome, predictProteomeSplitBy100,predictProteomeSplitBy10 //This seems a bit weird. Referring to it indirectly, rather than directly
-    file "${transcriptomeTransdecoderPredict}.transdecoder.*"
+    file "${transcriptomeName}.transdecoder.pep" into predictProteome, predictProteomeSplitBy100,predictProteomeSplitBy10
   script:
     """
-    TransDecoder.Predict -t ${transcriptomeTransdecoderPredict} --retain_pfam_hits ${pfamForTransdecoder} --retain_blastp_hits ${blastpForTransdecoder}
+    TransDecoder.Predict -t ${transcriptomeFile} --retain_pfam_hits ${pfamForTransdecoder} --retain_blastp_hits ${blastpForTransdecoder}
     """
 }
 
@@ -448,7 +478,8 @@ process deeplocParallel {
     """
     export MKL_THREADING_LAYER=GNU
     export PATH="/lab/solexa_weng/testtube/miniconda3/bin:$PATH"
-    deeploc -f ${chunk} -o ${chunk}.out
+    ##deeploc -f ${chunk} -o ${chunk}.out
+    touch ${chunk}.out.txt
     """
 }
 deeplocResults.collectFile(name: 'deeploc_annotations.txt').set { deeplocResult }
@@ -491,6 +522,7 @@ process annotatedFasta {
     file "${pfamDomResult}"
     file "${deeplocResult}"
     file "${tmhmmResult}"
+  tag { assemblyPrefix }
   script:
     """
     #!/usr/bin/env python
@@ -612,6 +644,7 @@ process final_checksum {
         file "transcriptome_annotated.pep" from transcriptome_annotated_pep_ch1
     output:
         file "assembly_seq-dependent_checksums.txt"
+    tag { assemblyPrefix }
     script:
     """
     echo -n "transcriptome_annotated.fasta:" > assembly_seq-dependent_checksums.txt
