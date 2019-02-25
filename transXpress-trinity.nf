@@ -70,6 +70,7 @@ done < samples.txt
 }
 relative_samples_txt_ch.into{ relative_samples_txt_ch1; relative_samples_txt_ch2; relative_samples_txt_ch3}
 
+
 process trinityInchwormChrysalis {
   cache 'lenient'
   label = "nf_"+assemblyPrefix+"_trinityInchwormChrysalis"
@@ -82,8 +83,8 @@ process trinityInchwormChrysalis {
   afterScript 'echo \"(Above completion message is from Trinity. transXpress will continue the pipeline execution.)\"'
   //afterScript 'exit(1)'
   input:
-    file filteredReadsFromPairs from filteredPairedReads_ch1.collect() //This flattens the tuple
-    file relative_samples_txt from relative_samples_txt_ch1
+     file filteredReadsFromPairs from filteredPairedReads_ch1.collect() //This flattens the tuple
+     file samples_file from relative_samples_txt_ch1
   output:
     file "trinity_out_dir/[!Tcr]*" into trinityWorkDirRootFiles_ch1, trinityWorkDirRootFiles_ch2 //Not files starting with c or r, so not chrysalis, read_partitions, recursive trinity cmds, Trinity.timing
     file "trinity_out_dir/chrysalis/*" into trinityWorkDirChrysalisFiles_ch1, trinityWorkDirChrysalisFiles_ch2
@@ -92,8 +93,8 @@ process trinityInchwormChrysalis {
 
   script:
     """
-    Trinity --no_distributed_trinity_exec --max_memory ${task.memory.toGiga()}G --CPU ${task.cpus} --samples_file ${relative_samples_txt} ${params.TRINITY_PARAMS}
-    sleep 30 ##Try to prevent filesystem latency errors
+    Trinity --no_distributed_trinity_exec --max_memory ${task.memory.toGiga()}G --CPU ${task.cpus} --samples_file ${samples_file} ${params.TRINITY_PARAMS}
+    sleep 5 ##Try to prevent filesystem latency errors
     #chmod -R a-w ./trinity_out_dir
     """
 }
