@@ -105,14 +105,14 @@ trinityPhase1ReadPartitionsFiles_ch.flatten().map{ file ->
 					dir1String = dir1Match[0]
 					dir2String = dir2Match[0]
  
-                                        return tuple([dir1String,dir2String],file)
+                                        return tuple( [dir1String,dir2String] ,file)
                                         }
                                         .groupTuple()
                                         .set{ partitionedReadGroups_ch }
 	//Add .groupTuple() to execute in groups by the directories
 
 process trinityButterflyParallelVersion2 {
-  //Note! This process has hardcoded parameters.  It should really be getting them from the TRINITY params...
+  //TODO This process has hardcoded parameters.  It should really be getting them from the TRINITY params...
   cache 'lenient'
   cpus 10
   input:
