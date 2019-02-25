@@ -33,8 +33,14 @@ Channel.fromPath(params.samples)
      .map{ row ->
      println row 
      return tuple(file(row[2]), file(row[3])) }
-     .set{ readPairs_ch }
+     .into{ readPairs_ch ; readPairs_ch2 }
 
+readPairs_ch2
+       .map{ item ->
+       item0 = '\"'+item[0]+'\"' //Double quoting the string
+       item1 = '\"'+item[1]+'\"' //Double quoting the string
+       return tuple(item0,item1) }
+       .set{ readPairsQuoted_ch1 }
 
 process trimmomatic {
 
@@ -44,8 +50,6 @@ input:
 tag {"$R1_reads"+" and " +"$R2_reads"}
 output:
   set file("${R1_reads}.R1-P.qtrim.fastq.gz"), file("${R2_reads}.R2-P.qtrim.fastq.gz") into filteredPairedReads_ch1,filteredPairedReads_ch2,filteredPairedReads_ch5
-  //file "${R1_reads}.R1-P.qtrim.fastq.gz" into filteredForwardReads_ch1,filteredForwardReads_ch2,filteredForwardReads_ch5
-  //file "${R2_reads}.R2-P.qtrim.fastq.gz" into filteredReverseReads_ch1,filteredReverseReads_ch2,filteredReverseReads_ch5
   file "*U.qtrim.fastq.gz" into filteredSingleReads_ch1,filteredSingleReads_ch2
 script:
 """
@@ -55,33 +59,46 @@ java -jar /lab/solexa_weng/testtube/trinityrnaseq-Trinity-v2.8.4/trinity-plugins
 
 
 process convertReadsToYAML {
-
 input:
-  file pairedReads from filteredPairedReads_ch1.collect() //collect flattens the tuple structure
-  //file forwardReads from filteredForwardReads_ch1.collect()
-  //file reverseReads from filteredReverseReads_ch1.collect()
+  val readPairTuples from readPairsQuoted_ch1.toList() //toList doesn't flatten the tuple structure
+  file pairedReads from filteredPairedReads_ch1.collect() //collect does flatten the tuple structure
   file unpairedReads from filteredSingleReads_ch1.collect()
 output:
   file "datasets.yaml" into datasets_YAML_ch
 script:
-"""
-   ##This is terrible hackery and I know it
-   echo "[{
-        orientation: "fr",
-        type: "paired-end",
-        right reads: [" >datasets.yaml
-   ls -1 ./*.R1-P.qtrim.fastq.gz | sed 's/^/\\"/g' | sed 's/\$/\\"/g' | sed 's/@\"/\\"/g' | tr "\\n" "," | sed 's/,\$//g' >>datasets.yaml
-   echo "]," >> datasets.yaml
-   echo "left reads: [" >> datasets.yaml
-   ls -1 ./*.R2-P.qtrim.fastq.gz | sed 's/^/\\"/g' | sed 's/\$/\\"/g' | sed 's/@\"/\\"/g' | tr "\\n" "," | sed 's/,\$//g' >>datasets.yaml
-   echo "]
-      }," >>datasets.yaml
-   echo "{
-        type: "single",
-        single reads: [" >> datasets.yaml
-   ls -1 ./*U.qtrim.fastq.gz | sed 's/^/\\"/g' | sed 's/\$/\\"/g' | sed 's/@\"/\\"/g' | tr "\\n" "," | sed 's/,\$//g' >>datasets.yaml
-   echo "]}]" >> datasets.yaml
-"""  
+    """
+    #!/usr/bin/env python
+    import glob
+    import pprint
+    
+    readPairs = ${readPairTuples} ##Little bit of hackery. Since groovy and python are similar, quoting the string values in the groovy datastructure makes a python datastructure
+    
+    sample_list = []
+    for p in readPairs:
+        f = p[0].split("/")[-1:][0] ##Just want the last part of the path.
+        r = p[1].split("/")[-1:][0] ##Just want the last part of the path.
+        assert len(glob.glob(f+"*.R1-P.qtrim.fastq.gz")) == 1
+        assert len(glob.glob(r+"*.R2-P.qtrim.fastq.gz")) == 1
+        f_trimmed = glob.glob(f+"*.R1-P.qtrim.fastq.gz") ##Use the last part of the path to find the trimmed version
+        r_trimmed = glob.glob(r+"*.R2-P.qtrim.fastq.gz") ##Use the last part of the path to find the trimmed version
+        sample_dict = dict()
+        sample_dict['orientation'] = 'fr'
+        sample_dict['type'] = 'paired-end'
+        sample_dict['right reads'] = f_trimmed
+        sample_dict['left reads'] = r_trimmed
+        sample_list.append(sample_dict)
+
+    unpaired_reads = glob.glob("*U.qtrim.fastq.gz")
+
+    for u in unpaired_reads:
+         sample_dict = dict()
+         sample_dict['type'] = 'single'
+         sample_dict['single reads'] = [u]
+         sample_list.append(sample_dict)
+    handle = open("datasets.yaml","w")
+    handle.write(pprint.pformat(sample_list))
+    handle.close()
+    """  
 }
 
 process runSPAdes {
