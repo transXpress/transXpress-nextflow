@@ -578,11 +578,11 @@ process transdecoderPredict {
 
 predictProteomeSplitBy100
   .splitFasta(by: 100, file: true)
-  .into { tmhmmChunks ; deeplocChunks }
+  .into { tmhmmChunks }
 
-//predictProteomeSplitBy10
-//  .splitFasta(by: 10, file: true)
-//  .set{ deeplocChunks }
+predictProteomeSplitBy10
+  .splitFasta(by: 10, file: true)
+  .set{ deeplocChunks }
 
 process deeplocParallel {
   input:
