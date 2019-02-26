@@ -33,8 +33,8 @@ process downloadEggNOG {
     file "NOG.annotations.tsv" into eggNOGDb
   script:
     """
-    wget "http://eggnogdb.embl.de/download/latest/data/NOG/NOG.annotations.tsv.gz" &> {log}
-    gunzip NOG.annotations.tsv.gz}
+    wget "http://eggnogdb.embl.de/download/latest/data/NOG/NOG.annotations.tsv.gz"
+    gunzip NOG.annotations.tsv.gz
     """
 }
 
@@ -124,7 +124,7 @@ executor 'local'
 input:
     file toRelative
 output:
-    file "relative_samples.txt" into relative_samples
+    file "relative_samples.txt" into relativeSamples_ch
 script:
 """
 while read LINE; do
@@ -136,7 +136,7 @@ while read LINE; do
 done < samples.txt
 """
 }
-relativeSamples.into{ samples_file_toTrinity; relativeSamples_toTrinityFinish; relativeSamples_toKallisto; samples_file_toYAMLConvert}
+relativeSamples_ch.into{ samples_file_toTrinity; relativeSamples_toTrinityFinish; relativeSamples_toKallisto; samples_file_toYAMLConvert}
 
 process trimmomatic {
 cpus 4
@@ -158,12 +158,14 @@ filteredPairedReads_toChoice.choice(filteredPairedReads_toTrinity,filteredPaired
 filteredPairedReads_toTrinity.collect().into{ trinityInchwormPairedReads ; trinityFinishPairedReads }
 
 process fastqc {
+publishDir "transXpress_results/fastqc_results/", mode: "copy"
 cpus 2
 input:
  set file(R1_reads),file(R2_reads) from fastqcReadPairs_ch
 tag {"$R1_reads"+" and " +"$R2_reads"}
 output:
- set file("${R1_reads}.fastqc.ok"), file("${R2_reads}.fastqc.ok") into fastqcResults
+ set file("${R1_reads}.fastqc.ok"), file("${R2_reads}.fastqc.ok") into fastqcPassResults
+ file "*.html" into fastqcHtmlResults
 script:
 """
 fastqc ${R1_reads} &
@@ -176,14 +178,9 @@ fastqc ${R2_reads}
 ##Dummy output for now
 touch ${R1_reads}.fastqc.ok
 touch ${R2_reads}.fastqc.ok
+sleep 15 ##Not a super important process, so might as well put in a delay to help with filesystem latency issues.
 """
 }
-
-filteredPairedReads_toTrinity = Channel.create()
-filteredPairedReads_toRnaspades = Channel.create()
-filteredPairedReads_toChoice.choice(filteredPairedReads_toTrinity,filteredPairedReads_toRnaspades) { params.assembler =~ /rinity/ ? 0 : 1 }
-
-filteredPairedReads_toTrinity.collect().into{ trinityInchwormPairedReads ; trinityFinishPairedReads }
 
 
 process relativeSamplesToYAML {
@@ -197,12 +194,13 @@ output:
 script:
     """
     #!/usr/bin/env python
+    import re
     import os
     import os.path
     import pprint
 
     sample_list = []
-    with open(${samples_file_toYAMLConvert}, "r") as input_handle:
+    with open("${samples_file_toYAMLConvert}", "r") as input_handle:
       for line in input_handle:
         row = re.split("[\t ]+", line)
         if (len(row) > 3): # paired reads
@@ -211,8 +209,8 @@ script:
           paired_dict['type'] = 'paired-end'
           f_reads = row[2].strip()
           r_reads = row[3].strip()
-          assert os.path.isfile(f_reads)
-          assert os.path.isfile(r_reads)
+          #assert os.path.isfile(f_reads)
+          #assert os.path.isfile(r_reads)
           paired_dict['left reads'] = [f_reads]
           paired_dict['right reads'] = [r_reads]
           ##Depends on where the unpaired reads are written to
@@ -235,7 +233,7 @@ script:
           unpaired_dict['single reads'] = [u_reads]
           sample_list.append(unpaired_dict)
 
-    with open(output["samples_yaml"], "w") as output_handle:
+    with open("samples_trimmed.yaml", "w") as output_handle:
       output_handle.write(pprint.pformat(sample_list))
     """
 }
@@ -422,7 +420,7 @@ process kallisto {
   input:
     file filteredReadsFromPairs from filteredPairedReads_toKallisto.collect() //This flattens the tuples
     set file(transcriptomeKallisto), file(geneTransMap) from transcriptomeGeneTransMapKallisto
-    file relativeSamples from relative_samples_toKallisto
+    file relativeSamples from relativeSamples_toKallisto
   output:
     file "kallisto.isoform.TPM.not_cross_norm" into rawKallistoTable
     file "kallisto.isoform.TMM.EXPR.matrix" optional true into normalizedKallistoTable
