@@ -92,7 +92,7 @@ process downloadPfam {
 }
 
 /*
- * Step 1. Assemble
+ * Step 1. De novo assembly
  */
 
 
@@ -135,7 +135,7 @@ while read LINE; do
 done < samples.txt
 """
 }
-relative_samples.into{ samples_file_toTrinity; relative_samples_toTrinityFinish; relative_samples_toKallisto; samples_file_toYAMLConvert}
+relativeSamples.into{ samples_file_toTrinity; relativeSamples_toTrinityFinish; relativeSamples_toKallisto; samples_file_toYAMLConvert}
 
 process trimmomatic {
 cpus 4
@@ -162,7 +162,7 @@ input:
     file samples_file_toYAMLConvert
     //file filteredPairedReads from filteredPairedReads_toYAML.collect() //collect flattens the tuple. This input ensures the process waits until trimmomatic is all done, and also allows for assertions as a sanity check
 output:
-    file "samples_trimmed.yaml" into yaml_samples_rnaspades_ch
+    file "samples_trimmed.yaml" into yaml_rnaSPAdes_ch
 
 script:
     """
@@ -297,7 +297,7 @@ process trinityFinish {
     file "trinity_out_dir/*" from trinityWorkDirRootFiles_ch2 //An attempt to relativize the butterfly processes
     file "trinity_out_dir/chrysalis/*" from trinityWorkDirChrysalisFiles_ch2 //An attempt to relativize the butterfly processes
     file butterflyTrinityFilesCollected from butterflyTrinityFiles.collect() 
-    file relative_samples_txt from relative_samples_toTrinityFinish
+    file relativeSamples from relativeSamples_toTrinityFinish
     file finishedCommands from trinityFinishedCmds.collectFile(name: "recursive_trinity.cmds.completed")
     file trinityCmdsCollected from trinityCmds.collectFile(name: "recursive_trinity.cmds")
     file trinityFinishPairedReads
@@ -320,7 +320,7 @@ process trinityFinish {
     cp ${trinityCmdsCollected} trinity_out_dir/recursive_trinity.cmds
     cp ${finishedCommands} trinity_out_dir/recursive_trinity.cmds.completed
     touch trinity_out_dir/recursive_trinity.cmds.ok
-    Trinity --samples_file ${relative_samples_txt} --max_memory ${task.memory.toGiga()}G ${params.TRINITY_PARAMS}
+    Trinity --samples_file ${relativeSamples} --max_memory ${task.memory.toGiga()}G ${params.TRINITY_PARAMS}
     """ 
 }
 
@@ -331,7 +331,7 @@ memory "200 GB"
 
 input:
    file filteredPairedReads from filteredPairedReads_toRnaspades.collect()
-   file datasets_YAML from yaml_samples_rnaspades_ch
+   file datasets_YAML from yaml_rnaSPAdes_ch
    //file filteredSingleReads from filteredSingleReads_ch2.collect()
 output:
    set val("rnaSPAdes"), file("rnaSPAdes.gene_trans_map"),file(assemblyPrefix+"_rnaSPAdes/transcripts.fasta") into rnaSPAdesFinalOutput
@@ -392,7 +392,7 @@ process kallisto {
   input:
     file filteredReadsFromPairs from filteredPairedReads_toKallisto.collect() //This flattens the tuples
     set file(transcriptomeKallisto), file(geneTransMap) from transcriptomeGeneTransMapKallisto
-    file relative_samples_txt from relative_samples_toKallisto
+    file relativeSamples from relative_samples_toKallisto
   output:
     file "kallisto.isoform.TPM.not_cross_norm" into rawKallistoTable
     file "kallisto.isoform.TMM.EXPR.matrix" optional true into normalizedKallistoTable
@@ -402,7 +402,7 @@ process kallisto {
     """
     export TRINITY_HOME=\$(dirname `which Trinity`)
     echo TRINITY_HOME set to \${TRINITY_HOME}
-    \${TRINITY_HOME}/util/align_and_estimate_abundance.pl --transcripts ${transcriptomeKallisto} ${params.STRAND_SPECIFIC} --seqType fq --samples_file ${relative_samples_txt} --prep_reference --thread_count ${task.cpus} --est_method kallisto --gene_trans_map ${geneTransMap}
+    \${TRINITY_HOME}/util/align_and_estimate_abundance.pl --transcripts ${transcriptomeKallisto} ${params.STRAND_SPECIFIC} --seqType fq --samples_file ${relativeSamples} --prep_reference --thread_count ${task.cpus} --est_method kallisto --gene_trans_map ${geneTransMap}
     \${TRINITY_HOME}/util/abundance_estimates_to_matrix.pl --est_method kallisto --name_sample_by_basedir --gene_trans_map $geneTransMap */abundance.tsv
     """
 }
@@ -460,6 +460,7 @@ process sprotBlastxParallel {
     """
 }
 
+
 process sprotBlastpParallel {
   cpus 2
   input:
@@ -476,6 +477,7 @@ process sprotBlastpParallel {
 }
 sprotBlastxResults.collectFile(name: 'blastx_annotations.tsv').set { blastxResult }
 sprotBlastpResults.collectFile(name: 'blastp_annotations.tsv').into { blastpForTransdecoder; blastpResult }
+
 
 process pfamParallel {
   cpus 2
@@ -494,6 +496,7 @@ process pfamParallel {
 }
 pfamResults.collectFile(name: 'pfam_annotations.txt').set { pfamResult }
 pfamDomResults.collectFile(name: 'pfam_dom_annotations.txt').into { pfamDomResult ; pfamForTransdecoder }
+
 
 process rfamParallel {
   cpus 2
@@ -598,6 +601,7 @@ process annotatedFasta {
     file deeplocResult
     file tmhmmResult 
   output:
+    //TODO: Fix this output names, so they are unique across different assemblers
     file assemblyPrefix+"_annotated.fasta" into transcriptome_annotated_fasta_ch
     file assemblyPrefix+"_annotated.pep" into transcriptome_annotated_pep_ch
     file "transcriptome_TPM_blast.csv"
