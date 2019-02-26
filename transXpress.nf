@@ -108,7 +108,7 @@ output:
   file "samples.txt" into toParse, toRelative
 script:
 """
-##just do nothing
+##just do nothing. This process is so the dag looks nicer
 """
 }
 toParse.splitCsv(sep:'\t',header:false)
@@ -117,6 +117,7 @@ toParse.splitCsv(sep:'\t',header:false)
      return tuple(file(row[2]), file(row[3])) }
      .set{ readPairs_ch }
 
+readPairs_ch.into{ trimReadPairs_ch ; fastqcReadPairs_ch }
 
 process convertSamplesToRelative {
 executor 'local'
@@ -140,7 +141,7 @@ relativeSamples.into{ samples_file_toTrinity; relativeSamples_toTrinityFinish; r
 process trimmomatic {
 cpus 4
 input:
- set file(R1_reads),file(R2_reads) from readPairs_ch
+ set file(R1_reads),file(R2_reads) from trimReadPairs_ch
 tag {"$R1_reads"+" and " +"$R2_reads"}
 output:
   set file("${R1_reads}.R1-P.qtrim.fastq.gz"), file("${R2_reads}.R2-P.qtrim.fastq.gz") into filteredPairedReads_toChoice,filteredPairedReads_toKallisto
@@ -155,6 +156,35 @@ filteredPairedReads_toRnaspades = Channel.create()
 filteredPairedReads_toChoice.choice(filteredPairedReads_toTrinity,filteredPairedReads_toRnaspades) { params.assembler =~ /rinity/ ? 0 : 1 }
 
 filteredPairedReads_toTrinity.collect().into{ trinityInchwormPairedReads ; trinityFinishPairedReads }
+
+process fastqc {
+cpus 2
+input:
+ set file(R1_reads),file(R2_reads) from fastqcReadPairs_ch
+tag {"$R1_reads"+" and " +"$R2_reads"}
+output:
+ set file("${R1_reads}.fastqc.ok"), file("${R2_reads}.fastqc.ok") into fastqcResults
+script:
+"""
+fastqc ${R1_reads} &
+fastqc ${R2_reads}
+
+##Check for bad run
+
+##If no bad run, produce the .fastqc.ok files
+
+##Dummy output for now
+touch ${R1_reads}.fastqc.ok
+touch ${R2_reads}.fastqc.ok
+"""
+}
+
+filteredPairedReads_toTrinity = Channel.create()
+filteredPairedReads_toRnaspades = Channel.create()
+filteredPairedReads_toChoice.choice(filteredPairedReads_toTrinity,filteredPairedReads_toRnaspades) { params.assembler =~ /rinity/ ? 0 : 1 }
+
+filteredPairedReads_toTrinity.collect().into{ trinityInchwormPairedReads ; trinityFinishPairedReads }
+
 
 process relativeSamplesToYAML {
 executor 'local'
