@@ -93,7 +93,7 @@ process relativeSamplesToYAML {
 executor 'local'
 input:
     file samples_file_toYAMLConvert
-    file filteredPairedReads from filteredPairedReads_toYAML.collect() //collect flattens the tuple. This input ensures the process waits until trimmomatic is all done, and also allows for assertions as a sanity check
+    //file filteredPairedReads from filteredPairedReads_toYAML.collect() //collect flattens the tuple. This input ensures the process waits until trimmomatic is all done, and also allows for assertions as a sanity check
 output:
     file "samples_trimmed.yaml" into yaml_samples_rnaspades_ch
 
@@ -114,8 +114,8 @@ script:
             splitline = l.strip().split(" ")
         f = splitline[2]
         r = splitline[3]
-        assert os.path.isfile(f)
-        assert os.path.isfile(r)
+        ##assert os.path.isfile(f)
+        ##assert os.path.isfile(r)
         sample_dict = dict()
         sample_dict['orientation'] = 'fr'
         sample_dict['type'] = 'paired-end'
