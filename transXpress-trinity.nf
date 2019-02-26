@@ -287,7 +287,7 @@ process renameAssembly {
     file "species.txt" from file(params.species) //Just a dummy input
    output:
     file "${assemblyPrefix}_${assembler}.fasta" into transcriptomeTransdecoder, transcriptomeStats, transcriptomeSplit, transcriptomeAnnotation
-    set file("${assemblyPrefix}_${assembler}.fasta") file("${assembler}_renamed.fasta.gene_trans_map") into transcriptomeGeneTransMapKallisto
+    set file("${assemblyPrefix}_${assembler}.fasta"), file("${assembler}_renamed.fasta.gene_trans_map") into transcriptomeGeneTransMapKallisto
 
    script:
    """
