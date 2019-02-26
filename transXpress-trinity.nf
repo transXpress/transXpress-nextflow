@@ -28,14 +28,47 @@ log.info """
 
 
 ///
-/// Load read files
+/// Load read files into channels
 ///
-Channel.fromPath(params.samples)
-     .splitCsv(sep:'\t',header:false)
+
+process loadSamples {
+input:
+  file "samples.txt" from file(params.samples)
+output:
+  file "samples.txt" into toParse, toRelative
+script:
+"""
+##just do nothing
+"""
+}
+toParse.splitCsv(sep:'\t',header:false)
      .map{ row ->
-     println row 
+     println row
      return tuple(file(row[2]), file(row[3])) }
      .set{ readPairs_ch }
+
+
+process convertSamplesToRelative {
+input:
+    file toRelative
+output:
+    file "relative_samples.txt" into relative_samples_txt_ch
+
+script:
+"""
+while read LINE; do
+  START=\$(echo "\$LINE" | cut -f 1,2)
+  FORWARD=\$(echo "\$LINE" | cut -f 3 | sed -r 's/[\\/\\.].+\\///g')".R1-P.qtrim.fastq.gz"
+  REVERSE=\$(echo "\$LINE" | cut -f 4 | sed -r 's/[\\/\\.].+\\///g')".R2-P.qtrim.fastq.gz"
+  echo \$FORWARD \$REVERSE
+  echo "\${START}\t\${FORWARD}\t\${REVERSE}" >> relative_samples.txt
+done < samples.txt
+"""
+}
+relative_samples_txt_ch.into{ samples_file_toTrinity; relative_samples_txt_ch2; relative_samples_txt_ch3}
+
+
+
  
 process trimmomatic {
 cpus 4
@@ -56,26 +89,6 @@ filteredPairedReads_toChoice.choice(filteredPairedReads_toTrinity,filteredPaired
 
 filteredPairedReads_toTrinity.collect().into{ trinityInchwormPairedReads ; trinityFinishPairedReads }
 
-process convertSamplesToRelative {
-input:
-    file "samples.txt" from file(params.samples)
-output:
-    file "relative_samples.txt" into relative_samples_txt_ch
-
-script:
-"""
-while read LINE; do
-  START=\$(echo "\$LINE" | cut -f 1,2)
-  FORWARD=\$(echo "\$LINE" | cut -f 3 | sed -r 's/[\\/\\.].+\\///g')".R1-P.qtrim.fastq.gz"
-  REVERSE=\$(echo "\$LINE" | cut -f 4 | sed -r 's/[\\/\\.].+\\///g')".R2-P.qtrim.fastq.gz"
-  echo \$FORWARD \$REVERSE
-  echo "\${START}\t\${FORWARD}\t\${REVERSE}" >> relative_samples.txt
-done < samples.txt
-"""
-}
-relative_samples_txt_ch.into{ relative_samples_txt_ch1; relative_samples_txt_ch2; relative_samples_txt_ch3}
-
-
 process trinityInchwormChrysalis {
   cache 'lenient'
   label = "nf_"+assemblyPrefix+"_trinityInchwormChrysalis"
@@ -89,7 +102,7 @@ process trinityInchwormChrysalis {
   //afterScript 'exit(1)'
   input:
      file trinityInchwormPairedReads //This flattens the tuple
-     file samples_file from relative_samples_txt_ch1
+     file samples_file from samples_file_toTrinity
   output:
     file "trinity_out_dir/[!Tcr]*" into trinityWorkDirRootFiles_ch1, trinityWorkDirRootFiles_ch2 //Not files starting with c or r, so not chrysalis, read_partitions, recursive trinity cmds, Trinity.timing
     file "trinity_out_dir/chrysalis/*" into trinityWorkDirChrysalisFiles_ch1, trinityWorkDirChrysalisFiles_ch2
