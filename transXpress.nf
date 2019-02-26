@@ -389,6 +389,18 @@ process downloadPfam {
     """
 }
 
+process downloadEggNOG {
+  executor 'local'
+  storeDir '/lab/solexa_weng/tmp/db'
+  output:
+    file "NOG.annotations.tsv" into eggNOGDb
+  script:
+    """
+    wget "http://eggnogdb.embl.de/download/latest/data/NOG/NOG.annotations.tsv.gz" &> {log}
+    gunzip NOG.annotations.tsv.gz}
+    """
+}
+
 process downloadVirusesUniref50 {
   executor 'local'
   storeDir '/lab/solexa_weng/tmp/db'
