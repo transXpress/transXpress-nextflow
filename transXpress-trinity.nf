@@ -32,6 +32,7 @@ log.info """
 ///
 
 process loadSamples {
+executor 'local'
 input:
   file "samples.txt" from file(params.samples)
 output:
@@ -49,6 +50,7 @@ toParse.splitCsv(sep:'\t',header:false)
 
 
 process convertSamplesToRelative {
+executor 'local'
 input:
     file toRelative
 output:
@@ -66,25 +68,48 @@ done < samples.txt
 }
 relative_samples.into{ samples_file_toTrinity; relative_samples_toTrinityFinish; relative_samples_toKallisto; samples_file_toYAMLConvert}
 
-process relativeSampleToYAML {
+process trimmomatic {
+cpus 4
+input:
+ set file(R1_reads),file(R2_reads) from readPairs_ch
+tag {"$R1_reads"+" and " +"$R2_reads"}
+output:
+  set file("${R1_reads}.R1-P.qtrim.fastq.gz"), file("${R2_reads}.R2-P.qtrim.fastq.gz") into filteredPairedReads_toChoice,filteredPairedReads_toKallisto,filteredPairedReads_toYAML
+  file "*U.qtrim.fastq.gz" into filteredSingleReads
+script:
+"""
+java -jar /lab/solexa_weng/testtube/trinityrnaseq-Trinity-v2.8.4/trinity-plugins/Trimmomatic/trimmomatic.jar PE -threads ${task.cpus}  ${R1_reads} ${R2_reads} ${R1_reads}.R1-P.qtrim.fastq.gz ${R1_reads}.R1-U.qtrim.fastq.gz ${R2_reads}.R2-P.qtrim.fastq.gz ${R2_reads}.R2-U.qtrim.fastq.gz  ILLUMINACLIP:/lab/solexa_weng/testtube/trinityrnaseq-Trinity-v2.8.4/trinity-plugins/Trimmomatic/adapters/TruSeq3-PE.fa:2:30:10 SLIDINGWINDOW:4:5 LEADING:5 TRAILING:5 MINLEN:25 
+"""
+}
+filteredPairedReads_toTrinity = Channel.create()
+filteredPairedReads_toRnaspades = Channel.create()
+filteredPairedReads_toChoice.choice(filteredPairedReads_toTrinity,filteredPairedReads_toRnaspades) { "trinity" =~ /rinity/ ? 0 : 1 }
+
+filteredPairedReads_toTrinity.collect().into{ trinityInchwormPairedReads ; trinityFinishPairedReads }
+
+process relativeSamplesToYAML {
+executor 'local'
 input:
     file samples_file_toYAMLConvert
+    file filteredPairedReads from filteredPairedReads_toYAML.collect() //collect flattens the tuple. This input ensures the process waits until trimmomatic is all done, and also allows for assertions as a sanity check
 output:
     file "samples_trimmed.yaml" into yaml_samples_rnaspades_ch
 
 script:
-"""
+    """
     #!/usr/bin/env python
     import os
     import os.path
     import pprint
     print("yaml conversion running")
-    read_handle = open("samples_trimmed.txt","r")
+    read_handle = open("${samples_file_toYAMLConvert}","r")
     lines = read_handle.readlines()
     
     sample_list = []
     for l in lines:
-        splitline = l.strip().split(" ")
+        splitline = l.strip().split("\t")
+        if len(splitline) == 1:
+            splitline = l.strip().split(" ")
         f = splitline[2]
         r = splitline[3]
         assert os.path.isfile(f)
@@ -109,29 +134,12 @@ script:
     write_handle.write(pprint.pformat(sample_list))
     write_handle.close()
     read_handle.close()
-"""
+    """
 }
 
 
  
-process trimmomatic {
-cpus 4
-input:
- set file(R1_reads),file(R2_reads) from readPairs_ch
-tag {"$R1_reads"+" and " +"$R2_reads"}
-output:
-  set file("${R1_reads}.R1-P.qtrim.fastq.gz"), file("${R2_reads}.R2-P.qtrim.fastq.gz") into filteredPairedReads_toChoice,filteredPairedReads_toKallisto
-  file "*U.qtrim.fastq.gz" into filteredSingleReads
-script:
-"""
-java -jar /lab/solexa_weng/testtube/trinityrnaseq-Trinity-v2.8.4/trinity-plugins/Trimmomatic/trimmomatic.jar PE -threads ${task.cpus}  ${R1_reads} ${R2_reads} ${R1_reads}.R1-P.qtrim.fastq.gz ${R1_reads}.R1-U.qtrim.fastq.gz ${R2_reads}.R2-P.qtrim.fastq.gz ${R2_reads}.R2-U.qtrim.fastq.gz  ILLUMINACLIP:/lab/solexa_weng/testtube/trinityrnaseq-Trinity-v2.8.4/trinity-plugins/Trimmomatic/adapters/TruSeq3-PE.fa:2:30:10 SLIDINGWINDOW:4:5 LEADING:5 TRAILING:5 MINLEN:25 
-"""
-}
-filteredPairedReads_toTrinity = Channel.create()
-filteredPairedReads_toRnaspades = Channel.create()
-filteredPairedReads_toChoice.choice(filteredPairedReads_toTrinity,filteredPairedReads_toRnaspades) { "trinity" =~ /rinity/ ? 0 : 1 }
 
-filteredPairedReads_toTrinity.collect().into{ trinityInchwormPairedReads ; trinityFinishPairedReads }
 
 process trinityInchwormChrysalis {
   cache 'lenient'
@@ -248,14 +256,14 @@ process trinityFinish {
     """ 
 }
 
-/*
+
 process runSPAdes {
 cpus 16
 memory "200 GB"
 
 input:
    file filteredPairedReads from filteredPairedReads_toRnaspades.collect()
-   file datasets_YAML from XXX
+   file datasets_YAML from yaml_samples_rnaspades_ch
    //file filteredSingleReads from filteredSingleReads_ch2.collect()
 output:
    file assemblyPrefix+"/transcripts.fasta" into spadesAssembly_ch
@@ -265,7 +273,7 @@ script:
 rnaspades.py --dataset ${datasets_YAML} -t ${task.cpus} -m ${task.memory.toGiga()} --fast -o ${assemblyPrefix} --only-assembler -k 47
 """
 }
-*/
+
 
 process renameTrinityAssembly {
    publishDir "transXpress_results", mode: "copy"
