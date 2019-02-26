@@ -19,11 +19,80 @@ assemblyPrefix = theDate+"_"+genus+"_"+species
 log.info """
  transXpress
  ===================================
- """+assemblyPrefix
+ """+assemblyPrefix+" assembling with "+params.assembler
 
 
 /*
- * Step 1. 
+ * Step 0 Download reference databases
+ */
+
+process downloadEggNOG {
+  executor 'local'
+  storeDir '/lab/solexa_weng/tmp/db'
+  output:
+    file "NOG.annotations.tsv" into eggNOGDb
+  script:
+    """
+    wget "http://eggnogdb.embl.de/download/latest/data/NOG/NOG.annotations.tsv.gz" &> {log}
+    gunzip NOG.annotations.tsv.gz}
+    """
+}
+
+process downloadVirusesUniref50 {
+  executor 'local'
+  storeDir '/lab/solexa_weng/tmp/db'
+  errorStrategy 'ignore'
+  output:
+    set file("virusesUniref50.pep.fasta"), file("virusesUniref50.pep.fasta.p??") into virusDb
+  script:
+    """
+    wget -t 3 -O virusesUniref50.pep.fasta.gz "https://www.uniprot.org/uniref/?query=uniprot%3A%28taxonomy%3A%22Viruses+%5B10239%5D%22%29+AND+identity%3A0.5&format=fasta&compress=yes"
+    gunzip virusesUniref50.pep.fasta.gz
+    makeblastdb -in virusesUniref50.pep.fasta -dbtype prot
+    """
+}
+
+process downloadRfam {
+  executor 'local'
+  storeDir '/lab/solexa_weng/tmp/db'
+  output:
+    set file("Rfam.cm"), file("Rfam.cm.???") into rfamDb
+  script:
+    """
+    wget "ftp://ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/Rfam.cm.gz"
+    gunzip Rfam.cm.gz
+    cmpress Rfam.cm
+    """
+}
+
+process downloadSprot {
+  executor 'local'
+  storeDir '/lab/solexa_weng/tmp/db'
+  output:
+    set file("uniprot_sprot.fasta"), file("uniprot_sprot.fasta.p??") into sprotDb
+  script:
+    """
+    wget "ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz"
+    gunzip uniprot_sprot.fasta.gz
+    makeblastdb -in uniprot_sprot.fasta -dbtype prot
+    """
+}
+
+process downloadPfam {
+  executor 'local'
+  storeDir '/lab/solexa_weng/tmp/db'
+  output:
+    set file("Pfam-A.hmm"), file("Pfam-A.hmm.h??") into pfamDb
+  script:
+    """
+    wget "ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.hmm.gz"
+    gunzip Pfam-A.hmm.gz
+    hmmpress Pfam-A.hmm
+    """
+}
+
+/*
+ * Step 1. Assemble
  */
 
 
@@ -138,13 +207,8 @@ script:
 
     with open(output["samples_yaml"], "w") as output_handle:
       output_handle.write(pprint.pformat(sample_list))
-
     """
 }
-
-
- 
-
 
 process trinityInchwormChrysalis {
   cache 'lenient'
@@ -283,21 +347,25 @@ paste tmp.txt tmp.txt > rnaSPAdes.gene_trans_map
 trinityFinalOutput.mix(rnaSPAdesFinalOutput).set{ finishedAssemblies }
 
 process renameAssembly {
+   executor 'local'
    publishDir "transXpress_results", mode: "copy"
-   tag { assemblyPrefix+"_${assembler}" }
    input:
     set val(assembler), file(geneTransMap), file(transcriptome_fasta) from finishedAssemblies
     file "species.txt" from file(params.species) //Just a dummy input
    output:
     file "${assemblyPrefix}_${assembler}.fasta" into transcriptomeTransdecoder, transcriptomeStats, transcriptomeSplit, transcriptomeAnnotation
     set file("${assemblyPrefix}_${assembler}.fasta"), file("${assembler}_renamed.fasta.gene_trans_map") into transcriptomeGeneTransMapKallisto
-
+   tag { assemblyPrefix+"_${assembler}" }
    script:
    """
    seqkit replace -p 'TRINITY_' -r '' ${transcriptome_fasta} | seqkit replace -p '^' -r '${assemblyPrefix}_${assembler}_' > ${assemblyPrefix}_${assembler}.fasta 
    cat ${geneTransMap} | sed 's/TRINITY_//g' | sed 's/^/${assemblyPrefix}_${assembler}_/g' | sed 's/\t/\t${assemblyPrefix}_${assembler}_/g' > ${assembler}_renamed.fasta.gene_trans_map
    """
 }
+
+/*
+ * Step 3. Annotate the assembly
+ */
 
 process transdecoderLongOrfs {
   publishDir "transXpress_results", mode: "copy"
@@ -376,71 +444,6 @@ longOrfsProteomeSplit
   .splitFasta(by: 100, file: true)
   .into { sprotBlastpChunks; pfamChunks }
 
-process downloadPfam {
-  executor 'local'
-  storeDir '/lab/solexa_weng/tmp/db'
-  output:
-    set file("Pfam-A.hmm"), file("Pfam-A.hmm.h??") into pfamDb
-  script:
-    """
-    wget "ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.hmm.gz"
-    gunzip Pfam-A.hmm.gz
-    hmmpress Pfam-A.hmm
-    """
-}
-
-process downloadEggNOG {
-  executor 'local'
-  storeDir '/lab/solexa_weng/tmp/db'
-  output:
-    file "NOG.annotations.tsv" into eggNOGDb
-  script:
-    """
-    wget "http://eggnogdb.embl.de/download/latest/data/NOG/NOG.annotations.tsv.gz" &> {log}
-    gunzip NOG.annotations.tsv.gz}
-    """
-}
-
-process downloadVirusesUniref50 {
-  executor 'local'
-  storeDir '/lab/solexa_weng/tmp/db'
-  errorStrategy 'ignore'
-  output:
-    set file("virusesUniref50.pep.fasta"), file("virusesUniref50.pep.fasta.p??") into virusDb
-  script:
-    """
-    wget -t 3 -O virusesUniref50.pep.fasta.gz "https://www.uniprot.org/uniref/?query=uniprot%3A%28taxonomy%3A%22Viruses+%5B10239%5D%22%29+AND+identity%3A0.5&format=fasta&compress=yes"
-    gunzip virusesUniref50.pep.fasta.gz
-    makeblastdb -in virusesUniref50.pep.fasta -dbtype prot
-    """
-}
-
-process downloadRfam {
-  executor 'local'
-  storeDir '/lab/solexa_weng/tmp/db'
-  output:
-    set file("Rfam.cm"), file("Rfam.cm.???") into rfamDb
-  script:
-    """
-    wget "ftp://ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/Rfam.cm.gz"
-    gunzip Rfam.cm.gz
-    cmpress Rfam.cm
-    """
-}
-
-process downloadSprot {
-  executor 'local'
-  storeDir '/lab/solexa_weng/tmp/db'
-  output:
-    set file("uniprot_sprot.fasta"), file("uniprot_sprot.fasta.p??") into sprotDb
-  script:
-    """
-    wget "ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz"
-    gunzip uniprot_sprot.fasta.gz
-    makeblastdb -in uniprot_sprot.fasta -dbtype prot
-    """
-}
-
 
 process sprotBlastxParallel {
   cpus 2
@@ -509,6 +512,7 @@ process rfamParallel {
 }
 
 process publishRfamResults {
+  executor 'local'
   publishDir "transXpress_results", mode: "copy"
   input:
     file rfamResult from rfamResults.collectFile(name: 'rfam_annotations_unsorted.txt')
@@ -543,11 +547,11 @@ process transdecoderPredict {
 
 predictProteomeSplitBy100
   .splitFasta(by: 100, file: true)
-  .set { tmhmmChunks }
+  .into { tmhmmChunks ; deeplocChunks }
 
-predictProteomeSplitBy10
-  .splitFasta(by: 10, file: true)
-  .set{ deeplocChunks }
+//predictProteomeSplitBy10
+//  .splitFasta(by: 10, file: true)
+//  .set{ deeplocChunks }
 
 process deeplocParallel {
   input:
@@ -559,9 +563,8 @@ process deeplocParallel {
     """
     export MKL_THREADING_LAYER=GNU
     export PATH="/lab/solexa_weng/testtube/miniconda3/bin:$PATH"
-    ##DISABLED FOR NOW. TOO SLOW! TODO: fix this
-    ##deeploc -f ${chunk} -o ${chunk}.out
-    touch ${chunk}.out.txt
+    deeploc -f ${chunk} -o ${chunk}.out
+    ##touch ${chunk}.out.txt
     """
 }
 deeplocResults.collectFile(name: 'deeploc_annotations.txt').set { deeplocResult }
@@ -720,6 +723,7 @@ transcriptome_annotated_fasta_ch.into { transcriptome_annotated_fasta_ch1 ; tran
 transcriptome_annotated_pep_ch.into { transcriptome_annotated_pep_ch1 ; transcriptome_annotated_pep_ch2 }
 
 process final_checksum {
+    executor 'local'
     publishDir "transXpress_results", mode: "copy"
     input:
         file "transcriptome_annotated.fasta" from transcriptome_annotated_fasta_ch1
