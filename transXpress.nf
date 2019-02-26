@@ -365,7 +365,7 @@ output:
    set val("rnaSPAdes"), file("rnaSPAdes.gene_trans_map"),file(assemblyPrefix+"_rnaSPAdes/transcripts.fasta") into rnaSPAdesFinalOutput
 script:
 """
-rnaspades.py --dataset ${datasets_YAML} -t ${task.cpus} -m ${task.memory.toGiga()} --fast -o ${assemblyPrefix}_rnaSPAdes --only-assembler -k 47
+rnaspades.py --dataset ${datasets_YAML} -t ${task.cpus} -m ${task.memory.toGiga()} -o ${assemblyPrefix}_rnaSPAdes --only-assembler -k 47
 ##Make a fake gene to transcript file:
 cat "${assemblyPrefix}_rnaSPAdes/transcripts.fasta" | grep ">" | tr -d ">" | cut -f 1 -d " " > tmp.txt
 paste tmp.txt tmp.txt > rnaSPAdes.gene_trans_map
