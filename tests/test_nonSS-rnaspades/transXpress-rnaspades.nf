@@ -1,1 +1,0 @@
-../../transXpress-rnaspades.nf

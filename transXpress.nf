@@ -7,8 +7,6 @@
  */
 
 
-assembler = "rnaspades"
-
 params.tempdir = "/lab/weng_scratch/tmp/"
 
 theDate = new java.util.Date().format( 'MMdd' )
@@ -85,7 +83,7 @@ java -jar /lab/solexa_weng/testtube/trinityrnaseq-Trinity-v2.8.4/trinity-plugins
 }
 filteredPairedReads_toTrinity = Channel.create()
 filteredPairedReads_toRnaspades = Channel.create()
-filteredPairedReads_toChoice.choice(filteredPairedReads_toTrinity,filteredPairedReads_toRnaspades) { assembler =~ /rinity/ ? 0 : 1 }
+filteredPairedReads_toChoice.choice(filteredPairedReads_toTrinity,filteredPairedReads_toRnaspades) { params.assembler =~ /rinity/ ? 0 : 1 }
 
 filteredPairedReads_toTrinity.collect().into{ trinityInchwormPairedReads ; trinityFinishPairedReads }
 
