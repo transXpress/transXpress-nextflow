@@ -65,7 +65,7 @@ while read LINE; do
 done < samples.txt
 """
 }
-relative_samples_txt_ch.into{ samples_file_toTrinity; relative_samples_txt_ch2; relative_samples_txt_ch3}
+relative_samples_txt_ch.into{ samples_file_toTrinity; relative_samples_toTrinityFinish; relative_samples_toKallisto}
 
 
 
@@ -176,7 +176,7 @@ process trinityFinish {
     file "trinity_out_dir/*" from trinityWorkDirRootFiles_ch2 //An attempt to relativize the butterfly processes
     file "trinity_out_dir/chrysalis/*" from trinityWorkDirChrysalisFiles_ch2 //An attempt to relativize the butterfly processes
     file butterflyTrinityFilesCollected from butterflyTrinityFiles.collect() 
-    file relative_samples_txt from relative_samples_txt_ch2
+    file relative_samples_txt from relative_samples_toTrinityFinish
     file finishedCommands from trinityFinishedCmds.collectFile(name: "recursive_trinity.cmds.completed")
     file trinityCmdsCollected from trinityCmds.collectFile(name: "recursive_trinity.cmds")
     file trinityFinishPairedReads
@@ -267,7 +267,7 @@ process kallisto {
     file filteredReadsFromPairs from filteredPairedReads_toKallisto.collect() //This flattens the tuples
     file transcriptomeKallisto
     file geneTransMap
-    file relative_samples_txt from relative_samples_txt_ch3
+    file relative_samples_txt from relative_samples_toKallisto
   output:
     file "kallisto.isoform.TPM.not_cross_norm" into rawKallistoTable
     file "kallisto.isoform.TMM.EXPR.matrix" optional true into normalizedKallistoTable
