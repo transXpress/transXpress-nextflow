@@ -8,16 +8,38 @@ Also see our sister project: [transXpress-snakemake](https://github.com/transXpr
 ## Dependencies
 
 Requires
-* NextFlow 19.02.0+
-* BioPython
-* samtools
-* R
-* infernal
-* seqkit
-* basic linux utitilies: wget, split
+* NextFlow 19.02.0+ (install from website)
+* fastqc (install via conda)
+* trimmomatic (install via conda)
+* Trinity (install via conda)
+* SPAdes (install via conda)
+* TransDecoder (install via conda)
+* BioPython (install via conda)
+* samtools (install via conda)
+* bowtie2 (install via conda)
+* infernal (install via conda)
+* HMMER (install via conda)
+* kallisto (install via conda)
+* NCBI BLAST+ (install via conda)
+* R (install via conda)
+* seqkit (install via conda)
+* [deeploc](http://www.cbs.dtu.dk/cgi-bin/nph-sw_request?deeploc)
+* basic Linux utitilies: wget, split, awk, cut, gzip
 
 ## Installation
 
+1. Install [Miniconda3](https://conda.io/en/latest/miniconda.html)
+2. Install other dependencies:  
+~~~
+ conda config --add channels bioconda
+ conda config --add channels conda-forge
+ conda config --add channels r
+ conda install snakemake fastqc trimmomatic trinity spades transdecoder biopython samtools bowtie2 infernal hmmer kallisto blast r seqkit
+~~~
+3. Install deeploc
+      * Download deeploc from http://www.cbs.dtu.dk/cgi-bin/nph-sw_request?deeploc
+      * Install dependencies: `pip install -r requirements.txt`
+      * Install deeploc: `python setup.py install` or locally: `python setup.py install --user`
 
 ## Usage
 Make your assembly directory and change it to the current directory
@@ -39,10 +61,6 @@ Execute the run.sh script with your assembler of choice, either `trinity` or `rn
 ```
 NextFlow only likes 1 assembly per directory, so if you'd like to run two assemblies simultaneously, you have to use different assembly directories.
 
-## Flow
+## Flow graph
+![Directed acyclic graph for transXpress-nextflow program execution](./tests/test_nonSS-trinity/test_nonSS_dag.svg)
 
-**Trinity**
-![Directed acyclic graph for Trinity transXpress-nextflow program execution](./tests/test_nonSS-trinity/test_nonSS_dag.svg)
-
-**rnaSPAdes**
-![Directed acyclic graph for rnaSPAdes transXpress-rnaspades program execution](./tests/test_nonSS-rnaspades/test_nonSS_dag.svg)
