@@ -7,7 +7,7 @@
  */
 
 
-assembler = "trinity"
+assembler = "rnaspades"
 
 params.tempdir = "/lab/weng_scratch/tmp/"
 
@@ -235,8 +235,7 @@ process trinityFinish {
     file trinityCmdsCollected from trinityCmds.collectFile(name: "recursive_trinity.cmds")
     file trinityFinishPairedReads
   output:
-    file "./trinity_out_dir/Trinity.fasta.gene_trans_map" into originalGeneTransMap
-    file "./trinity_out_dir/Trinity.fasta" into Trinity_fasta_ch
+    set val("Trinity"), file("./trinity_out_dir/Trinity.fasta.gene_trans_map"),file("./trinity_out_dir/Trinity.fasta") into trinityFinalOutput
     file "./trinity_out_dir/recursive_trinity.cmds.completed"
   memory "1 GB"
   tag { assemblyPrefix+"_Trinity" }
@@ -268,30 +267,32 @@ input:
    file datasets_YAML from yaml_samples_rnaspades_ch
    //file filteredSingleReads from filteredSingleReads_ch2.collect()
 output:
-   file assemblyPrefix+"_rnaSPAdes/transcripts.fasta" into spadesAssembly_ch
-
+   set val("rnaSPAdes"), file("rnaSPAdes.gene_trans_map"),file(assemblyPrefix+"_rnaSPAdes/transcripts.fasta") into rnaSPAdesFinalOutput
 script:
 """
 rnaspades.py --dataset ${datasets_YAML} -t ${task.cpus} -m ${task.memory.toGiga()} --fast -o ${assemblyPrefix}_rnaSPAdes --only-assembler -k 47
+##Make a fake gene to transcript file:
+cat "${assemblyPrefix}_rnaSPAdes/transcripts.fasta" | grep ">" | tr -d ">" | cut -f 1 -d " " > tmp.txt
+paste tmp.txt tmp.txt > rnaSPAdes.gene_trans_map
 """
 }
 
+trinityFinalOutput.mix(rnaSPAdesFinalOutput).set{ finishedAssemblies }
 
-process renameTrinityAssembly {
+process renameAssembly {
    publishDir "transXpress_results", mode: "copy"
-   tag { assemblyPrefix+"_Trinity" }
+   tag { assemblyPrefix+"_${assembler}" }
    input:
-    file "Trinity.fasta" from Trinity_fasta_ch
+    set val(assembler), file(geneTransMap), file(transcriptome_fasta) from finishedAssemblies
     file "species.txt" from file(params.species) //Just a dummy input
-    file "Trinity.fasta.gene_trans_map" from originalGeneTransMap
    output:
-    file assemblyPrefix+"_Trinity.fasta" into transcriptomeKallisto, transcriptomeTransdecoder, transcriptomeStats, transcriptomeSplit, transcriptomeAnnotation
-    file "Trinity_renamed.fasta.gene_trans_map" into geneTransMap
+    file "${assemblyPrefix}_${assembler}.fasta" into transcriptomeTransdecoder, transcriptomeStats, transcriptomeSplit, transcriptomeAnnotation
+    set file("${assemblyPrefix}_${assembler}.fasta") file("${assembler}_renamed.fasta.gene_trans_map") into transcriptomeGeneTransMapKallisto
 
    script:
    """
-   seqkit replace -p '^TRINITY' -r '${assemblyPrefix}_Trinity' Trinity.fasta > ${assemblyPrefix}_Trinity.fasta 
-   cat Trinity.fasta.gene_trans_map | sed 's/^TRINITY/${assemblyPrefix}_Trinity/' | sed 's/\tTRINITY/\t${assemblyPrefix}_Trinity/g' > Trinity_renamed.fasta.gene_trans_map
+   seqkit replace -p 'TRINITY_' -r '' ${transcriptome_fasta} | seqkit replace -p '^' -r '${assemblyPrefix}_${assembler}_' > ${assemblyPrefix}_${assembler}.fasta 
+   cat ${geneTransMap} | sed 's/TRINITY_//g' | sed 's/^/${assemblyPrefix}_${assembler}_/g' | sed 's/\t/\t${assemblyPrefix}_${assembler}_/g' > ${assembler}_renamed.fasta.gene_trans_map
    """
 }
 
@@ -319,8 +320,7 @@ process kallisto {
   tag { assemblyPrefix }
   input:
     file filteredReadsFromPairs from filteredPairedReads_toKallisto.collect() //This flattens the tuples
-    file transcriptomeKallisto
-    file geneTransMap
+    set file(transcriptomeKallisto), file(geneTransMap) from transcriptomeGeneTransMapKallisto
     file relative_samples_txt from relative_samples_toKallisto
   output:
     file "kallisto.isoform.TPM.not_cross_norm" into rawKallistoTable
@@ -535,7 +535,6 @@ predictProteomeSplitBy10
   .set{ deeplocChunks }
 
 process deeplocParallel {
-  maxForks 11 //DELETE WHEN DONE TESTING
   input:
     file chunk from deeplocChunks
   output:
