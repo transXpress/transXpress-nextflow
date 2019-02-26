@@ -76,8 +76,8 @@ input:
  set file(R1_reads),file(R2_reads) from readPairs_ch
 tag {"$R1_reads"+" and " +"$R2_reads"}
 output:
-  set file("${R1_reads}.R1-P.qtrim.fastq.gz"), file("${R2_reads}.R2-P.qtrim.fastq.gz") into filteredPairedReads_toChoice,filteredPairedReads_toKallisto,filteredPairedReads_toYAML
-  file "*U.qtrim.fastq.gz" into filteredSingleReads
+  set file("${R1_reads}.R1-P.qtrim.fastq.gz"), file("${R2_reads}.R2-P.qtrim.fastq.gz") into filteredPairedReads_toChoice,filteredPairedReads_toKallisto
+  //file "*U.qtrim.fastq.gz" into filteredSingleReads
 script:
 """
 java -jar /lab/solexa_weng/testtube/trinityrnaseq-Trinity-v2.8.4/trinity-plugins/Trimmomatic/trimmomatic.jar PE -threads ${task.cpus}  ${R1_reads} ${R2_reads} ${R1_reads}.R1-P.qtrim.fastq.gz ${R1_reads}.R1-U.qtrim.fastq.gz ${R2_reads}.R2-P.qtrim.fastq.gz ${R2_reads}.R2-U.qtrim.fastq.gz  ILLUMINACLIP:/lab/solexa_weng/testtube/trinityrnaseq-Trinity-v2.8.4/trinity-plugins/Trimmomatic/adapters/TruSeq3-PE.fa:2:30:10 SLIDINGWINDOW:4:5 LEADING:5 TRAILING:5 MINLEN:25 
