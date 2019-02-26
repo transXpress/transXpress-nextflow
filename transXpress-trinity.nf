@@ -544,6 +544,7 @@ process deeplocParallel {
     """
     export MKL_THREADING_LAYER=GNU
     export PATH="/lab/solexa_weng/testtube/miniconda3/bin:$PATH"
+    ##DISABLED FOR NOW. TOO SLOW! TODO: fix this
     ##deeploc -f ${chunk} -o ${chunk}.out
     touch ${chunk}.out.txt
     """
