@@ -52,8 +52,7 @@ process convertSamplesToRelative {
 input:
     file toRelative
 output:
-    file "relative_samples.txt" into relative_samples_txt_ch
-
+    file "relative_samples.txt" into relative_samples
 script:
 """
 while read LINE; do
@@ -65,7 +64,7 @@ while read LINE; do
 done < samples.txt
 """
 }
-relative_samples_txt_ch.into{ samples_file_toTrinity; relative_samples_toTrinityFinish; relative_samples_toKallisto}
+relative_samples.into{ samples_file_toTrinity; relative_samples_toTrinityFinish; relative_samples_toKallisto}
 
 
 

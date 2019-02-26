@@ -65,7 +65,7 @@
 <g id="edge6" class="edge"><title>p4&#45;&gt;p5</title>
 <path fill="none" stroke="black" d="M533.813,-1862.88C540.699,-1849.82 548.5,-1831.14 548.5,-1813.5 548.5,-1813.5 548.5,-1813.5 548.5,-1637.5 548.5,-1627.74 548.5,-1616.7 548.5,-1608.39"/>
 <polygon fill="black" stroke="black" points="552,-1608.15 548.5,-1598.15 545,-1608.15 552,-1608.15"/>
-<text text-anchor="middle" x="617.5" y="-1721.8" font-family="Times,serif" font-size="14.00">relative_samples_txt_ch</text>
+<text text-anchor="middle" x="596" y="-1721.8" font-family="Times,serif" font-size="14.00">relative_samples</text>
 </g>
 <!-- p6 -->
 <g id="node6" class="node"><title>p6</title>
