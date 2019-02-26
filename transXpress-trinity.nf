@@ -7,6 +7,8 @@
  */
 
 
+assembler = "trinity"
+
 params.tempdir = "/lab/weng_scratch/tmp/"
 
 theDate = new java.util.Date().format( 'MMdd' )
@@ -14,7 +16,7 @@ theDate = new java.util.Date().format( 'MMdd' )
 theText = file(params.species).text
 genus = theText.split(" ")[0]
 species = theText.split(" ")[1].trim()
-assemblyPrefix = theDate+"_"+genus+"_"+species+"_Trinity"
+assemblyPrefix = theDate+"_"+genus+"_"+species
 
 log.info """
  transXpress
@@ -83,7 +85,7 @@ java -jar /lab/solexa_weng/testtube/trinityrnaseq-Trinity-v2.8.4/trinity-plugins
 }
 filteredPairedReads_toTrinity = Channel.create()
 filteredPairedReads_toRnaspades = Channel.create()
-filteredPairedReads_toChoice.choice(filteredPairedReads_toTrinity,filteredPairedReads_toRnaspades) { "trinity" =~ /rinity/ ? 0 : 1 }
+filteredPairedReads_toChoice.choice(filteredPairedReads_toTrinity,filteredPairedReads_toRnaspades) { assembler =~ /rinity/ ? 0 : 1 }
 
 filteredPairedReads_toTrinity.collect().into{ trinityInchwormPairedReads ; trinityFinishPairedReads }
 
@@ -195,7 +197,7 @@ process trinityButterflyParallelVersion2 {
    file "commands.completed" into trinityFinishedCmds
    file "commands.txt" into trinityCmds
    file "trinity_out_dir/read_partitions/*/*/*out.Trinity.fasta" into butterflyTrinityFiles
-  tag { assemblyPrefix+"-"+dir[0]+"/"+dir[1]}
+  tag { assemblyPrefix+"_Trinity-"+dir[0]+"/"+dir[1]}
   script:
     """
     ##Have to recreate the directory structure for the read_parition files
@@ -237,7 +239,7 @@ process trinityFinish {
     file "./trinity_out_dir/Trinity.fasta" into Trinity_fasta_ch
     file "./trinity_out_dir/recursive_trinity.cmds.completed"
   memory "1 GB"
-  tag { assemblyPrefix }
+  tag { assemblyPrefix+"_Trinity" }
   script:
     """
     mkdir trinity_out_dir/read_partitions/
@@ -266,30 +268,30 @@ input:
    file datasets_YAML from yaml_samples_rnaspades_ch
    //file filteredSingleReads from filteredSingleReads_ch2.collect()
 output:
-   file assemblyPrefix+"/transcripts.fasta" into spadesAssembly_ch
+   file assemblyPrefix+"_rnaSPAdes/transcripts.fasta" into spadesAssembly_ch
 
 script:
 """
-rnaspades.py --dataset ${datasets_YAML} -t ${task.cpus} -m ${task.memory.toGiga()} --fast -o ${assemblyPrefix} --only-assembler -k 47
+rnaspades.py --dataset ${datasets_YAML} -t ${task.cpus} -m ${task.memory.toGiga()} --fast -o ${assemblyPrefix}_rnaSPAdes --only-assembler -k 47
 """
 }
 
 
 process renameTrinityAssembly {
    publishDir "transXpress_results", mode: "copy"
-   tag { assemblyPrefix }
+   tag { assemblyPrefix+"_Trinity" }
    input:
     file "Trinity.fasta" from Trinity_fasta_ch
     file "species.txt" from file(params.species) //Just a dummy input
     file "Trinity.fasta.gene_trans_map" from originalGeneTransMap
    output:
-    file assemblyPrefix+".fasta" into transcriptomeKallisto, transcriptomeTransdecoder, transcriptomeStats, transcriptomeSplit, transcriptomeAnnotation
+    file assemblyPrefix+"_Trinity.fasta" into transcriptomeKallisto, transcriptomeTransdecoder, transcriptomeStats, transcriptomeSplit, transcriptomeAnnotation
     file "Trinity_renamed.fasta.gene_trans_map" into geneTransMap
 
    script:
    """
-   seqkit replace -p '^TRINITY' -r '${assemblyPrefix}' Trinity.fasta > ${assemblyPrefix}.fasta 
-   cat Trinity.fasta.gene_trans_map | sed 's/^TRINITY/${assemblyPrefix}/' | sed 's/\tTRINITY/\t${assemblyPrefix}/g' > Trinity_renamed.fasta.gene_trans_map
+   seqkit replace -p '^TRINITY' -r '${assemblyPrefix}_Trinity' Trinity.fasta > ${assemblyPrefix}_Trinity.fasta 
+   cat Trinity.fasta.gene_trans_map | sed 's/^TRINITY/${assemblyPrefix}_Trinity/' | sed 's/\tTRINITY/\t${assemblyPrefix}_Trinity/g' > Trinity_renamed.fasta.gene_trans_map
    """
 }
 
