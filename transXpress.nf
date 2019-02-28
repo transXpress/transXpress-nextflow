@@ -381,7 +381,7 @@ process renameAssembly {
     set val(assembler), file(geneTransMap), file(transcriptome_fasta) from finishedAssemblies
     file "species.txt" from file(params.species) //Just a dummy input
    output:
-    file "${assemblyPrefix}_${assembler}.fasta" into transcriptomeTransdecoder, transcriptomeStats, transcriptomeSplit, transcriptomeAnnotation
+    file "${assemblyPrefix}_${assembler}.fasta" into transcriptomeToTransdecoder, transcriptomeToStats, transcriptomeToSplit, transcriptomeToAnnotation
     set file("${assemblyPrefix}_${assembler}.fasta"), file("${assembler}_renamed.fasta.gene_trans_map") into transcriptomeGeneTransMapKallisto
    tag { assemblyPrefix+"_${assembler}" }
    script:
@@ -399,7 +399,7 @@ process transdecoderLongOrfs {
   publishDir "transXpress_results", mode: "copy"
   tag { assemblyPrefix }
   input:
-    file transcriptomeTransdecoder
+    set val(assemblerTransdecoder),file(transcriptomeTransdecoder) from transcriptomeToTransdecoder
   output:
     file "${transcriptomeTransdecoder}.transdecoder_dir/*.pep" into longOrfsProteomeSplit
     file "${transcriptomeTransdecoder}.transdecoder_dir/*" into transdecoderLongOrfsDirFiles
@@ -448,7 +448,7 @@ process trinityStats {
   cpus 1
   tag { assemblyPrefix }
   input:
-    file transcriptomeStats
+    set val(assemblerStats), file(transcriptomeStats) from transcriptomeToStats
     file expressionStats
   output:
     file "transcriptome_stats.txt"
@@ -464,7 +464,7 @@ process trinityStats {
 }
 
 
-transcriptomeSplit
+transcriptomeToSplit
   .splitFasta(by: 100, file: true)
   .into { sprotBlastxChunks; rfamChunks }
 
@@ -617,7 +617,7 @@ process tmhmmParallel {
 process annotatedFasta {
   publishDir "transXpress_results", mode: "copy"
   input:
-    file transcriptomeFile from transcriptomeAnnotation
+    set val(assemblyAnnotation),file(transcriptomeFile) from transcriptomeToAnnotation
     file proteomeFile from predictProteome
     file kallistoFile from transcriptExpression
     file blastxResult
