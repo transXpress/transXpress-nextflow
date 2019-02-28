@@ -598,7 +598,6 @@ process deeplocParallel {
     ##touch ${chunk}.out.txt
     """
 }
-deeplocResults.collectFile(name: 'deeploc_annotations.txt').set { deeplocResult }
 
 process tmhmmParallel {
   cpus 1
@@ -613,7 +612,6 @@ process tmhmmParallel {
     tmhmm --short < ${chunk} > tmhmm_out
     """
 }
-tmhmmResults.collectFile(name: 'tmhmm_annotations.tsv').set { tmhmmResult }
 
 // Collect parallelized annotations
 process annotatedFasta {
@@ -622,12 +620,12 @@ process annotatedFasta {
     file transcriptomeFile from transcriptomeAnnotation
     file proteomeFile from predictProteome
     file kallistoFile from transcriptExpression
-    file blastxResult 
-    file blastpResult
+    file blastxResult
+    file blastpResult 
     file pfamResult 
     file pfamDomResult 
-    file deeplocResult
-    file tmhmmResult 
+    file deeplocResult from deeplocResults.collectFile(name: 'deeploc_annotations.txt')
+    file tmhmmResult from tmhmmResults.collectFile(name: 'tmhmm_annotations.tsv')
   output:
     //TODO: Fix this output names, so they are unique across different assemblers
     file assemblyPrefix+"_annotated.fasta" into transcriptome_annotated_fasta_ch
@@ -705,7 +703,7 @@ process annotatedFasta {
       csv_reader = csv.reader(input_handle, delimiter="\t")
       for row in csv_reader:
         if (len(row) < 2): continue
-        deeploc_annotations[row[0]] = str(row[1])
+        deeploc_annotations[re.split("[\t ]+",row[0])[0]] = str(row[1]) ##re.split tries to pull out the fasta record ID
     
     ## Do the work
     print ("Annotating FASTA file ${transcriptomeFile}")
