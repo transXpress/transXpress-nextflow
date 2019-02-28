@@ -409,7 +409,7 @@ process transdecoderLongOrfs {
   script:
     """
     TransDecoder.LongOrfs -t ${transcriptomeTransdecoder}
-    chmod -R a-w ${transcriptomeTransdecoder}.transdecoder_dir/ ##write protect the output to troubleshoot downstream accessing.
+    #chmod -R a-w ${transcriptomeTransdecoder}.transdecoder_dir/ ##write protect the output to troubleshoot downstream accessing.
     """
 }
 
