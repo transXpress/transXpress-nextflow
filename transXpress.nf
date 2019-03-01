@@ -12,14 +12,13 @@ params.tempdir = "/lab/weng_scratch/tmp/"
 theDate = new java.util.Date().format( 'MMdd' )
 
 theText = file(params.species).text
-genus = theText.split(" ")[0]
-species = theText.split(" ")[1].trim()
-assemblyPrefix = theDate+"_"+genus+"_"+species
+metadata = theText.replace(" ","_").trim()
+dateMetadataPrefix = theDate+"_"+metadata+"_"
 
 log.info """
  transXpress
  ===================================
- """+assemblyPrefix+" assembling with "+params.assembler
+ """+theDate+"_"+metadata+" assembling with "+params.assembler
 
 
 /*
@@ -240,12 +239,12 @@ script:
 
 process trinityInchwormChrysalis {
   cache 'lenient'
-  label = "nf_"+assemblyPrefix+"_trinityInchwormChrysalis"
+  label = "nf_"+dateMetadataPrefix+"_trinityInchwormChrysalis"
 
   cpus 12
   memory "200 GB"
 
-  tag { assemblyPrefix }
+  tag { dateMetadataPrefix+"Trinity" }
 
   afterScript 'echo \"(Above completion message is from Trinity. transXpress will continue the pipeline execution.)\"'
   //afterScript 'exit(1)'
@@ -292,10 +291,10 @@ process trinityButterflyParallelVersion2 {
    file "commands.completed" into trinityFinishedCmds
    file "commands.txt" into trinityCmds
    file "trinity_out_dir/read_partitions/*/*/*out.Trinity.fasta" into butterflyTrinityFiles
-  tag { assemblyPrefix+"_Trinity-"+dir[0]+"/"+dir[1]}
+  tag { dateMetadataPrefix+"Trinity-"+dir[0]+"/"+dir[1]}
   script:
     """
-    ##Have to recreate the directory structure for the read_parition files
+    ##Have to recreate the directory structure for the read_partition files
     mkdir "trinity_out_dir/read_partitions"
     mkdir "trinity_out_dir/read_partitions/${dir[0]}"
     mkdir "trinity_out_dir/read_partitions/${dir[0]}/${dir[1]}"
@@ -333,7 +332,7 @@ process trinityFinish {
     set val("Trinity"), file("./trinity_out_dir/Trinity.fasta.gene_trans_map"),file("./trinity_out_dir/Trinity.fasta") into trinityFinalOutput
     file "./trinity_out_dir/recursive_trinity.cmds.completed"
   memory "1 GB"
-  tag { assemblyPrefix+"_Trinity" }
+  tag { dateMetadataPrefix+"Trinity" }
   script:
     """
     mkdir trinity_out_dir/read_partitions/
@@ -362,12 +361,12 @@ input:
    file datasets_YAML from yaml_rnaSPAdes_ch
    //file filteredSingleReads from filteredSingleReads_ch2.collect()
 output:
-   set val("rnaSPAdes"), file("rnaSPAdes.gene_trans_map"),file(assemblyPrefix+"_rnaSPAdes/transcripts.fasta") into rnaSPAdesFinalOutput
+   set val("rnaSPAdes"), file("rnaSPAdes.gene_trans_map"),file(dateMetadataPrefix+"_rnaSPAdes/transcripts.fasta") into rnaSPAdesFinalOutput
 script:
 """
-rnaspades.py --dataset ${datasets_YAML} -t ${task.cpus} -m ${task.memory.toGiga()} -o ${assemblyPrefix}_rnaSPAdes --only-assembler -k 47
+rnaspades.py --dataset ${datasets_YAML} -t ${task.cpus} -m ${task.memory.toGiga()} -o ${dateMetadataPrefix}rnaSPAdes --only-assembler -k 47
 ##Make a fake gene to transcript file:
-cat "${assemblyPrefix}_rnaSPAdes/transcripts.fasta" | grep ">" | tr -d ">" | cut -f 1 -d " " > tmp.txt
+cat "${dateMetadataPrefix}rnaSPAdes/transcripts.fasta" | grep ">" | tr -d ">" | cut -f 1 -d " " > tmp.txt
 paste tmp.txt tmp.txt > rnaSPAdes.gene_trans_map
 """
 }
@@ -381,13 +380,14 @@ process renameAssembly {
     set val(assembler), file(geneTransMap), file(transcriptome_fasta) from finishedAssemblies
     file "species.txt" from file(params.species) //Just a dummy input
    output:
-    file "${assemblyPrefix}_${assembler}.fasta" into transcriptomeToTransdecoder, transcriptomeToStats, transcriptomeToSplit, transcriptomeToAnnotation
-    set file("${assemblyPrefix}_${assembler}.fasta"), file("${assembler}_renamed.fasta.gene_trans_map") into transcriptomeGeneTransMapKallisto
-   tag { assemblyPrefix+"_${assembler}" }
+    file "${dateMetadataPrefix}${assembler}.transcripts.fasta" into transcriptomeToSplit 
+    set assembler, file("${dateMetadataPrefix}${assembler}.transcripts.fasta") into transcriptomeToTransdecoder, transcriptomeToStats, transcriptomeToAnnotation //Also pass the assembler type along
+    set assembler, file("${dateMetadataPrefix}${assembler}.transcripts.fasta"), file("${assembler}_renamed.fasta.gene_trans_map") into transcriptomeGeneTransMapKallisto
+   tag { dateMetadataPrefix+"${assembler}" }
    script:
    """
-   seqkit replace -p 'TRINITY_' -r '' ${transcriptome_fasta} | seqkit replace -p '^' -r '${assemblyPrefix}_${assembler}_' > ${assemblyPrefix}_${assembler}.fasta 
-   cat ${geneTransMap} | sed 's/TRINITY_//g' | sed 's/^/${assemblyPrefix}_${assembler}_/g' | sed 's/\t/\t${assemblyPrefix}_${assembler}_/g' > ${assembler}_renamed.fasta.gene_trans_map
+   seqkit replace -p 'TRINITY_' -r '' ${transcriptome_fasta} | seqkit replace -p '^' -r '${dateMetadataPrefix}${assembler}_' > ${dateMetadataPrefix}${assembler}.transcripts.fasta 
+   cat ${geneTransMap} | sed 's/TRINITY_//g' | sed 's/^/${dateMetadataPrefix}${assembler}_/g' | sed 's/\t/\t${dateMetadataPrefix}${assembler}_/g' > ${assembler}_renamed.fasta.gene_trans_map
    """
 }
 
@@ -397,15 +397,15 @@ process renameAssembly {
 
 process transdecoderLongOrfs {
   publishDir "transXpress_results", mode: "copy"
-  tag { assemblyPrefix }
   input:
-    set val(assemblerTransdecoder),file(transcriptomeTransdecoder) from transcriptomeToTransdecoder
+    set val(assemblerName),file(transcriptomeTransdecoder) from transcriptomeToTransdecoder
   output:
     file "${transcriptomeTransdecoder}.transdecoder_dir/*.pep" into longOrfsProteomeSplit
     file "${transcriptomeTransdecoder}.transdecoder_dir/*" into transdecoderLongOrfsDirFiles
     file "${transcriptomeTransdecoder}.transdecoder_dir.__checkpoints_longorfs/*" into longOrfsCheckpointsFiles
     file "*.cmds" into longOrfsRootCmds
-    set val("${transcriptomeTransdecoder}"), file(transcriptomeTransdecoder) into transcriptomeTransdecoderPredict
+    set val("${assemblerName}"), file(transcriptomeTransdecoder) into transcriptomeTransdecoderPredict
+  tag { dateMetadataPrefix+"${assemblerName}" }
   script:
     """
     TransDecoder.LongOrfs -t ${transcriptomeTransdecoder}
@@ -416,16 +416,16 @@ process transdecoderLongOrfs {
 process kallisto {
   publishDir "transXpress_results", mode: "copy"
   cpus 10
-  tag { assemblyPrefix }
   input:
     file filteredReadsFromPairs from filteredPairedReads_toKallisto.collect() //This flattens the tuples
-    set file(transcriptomeKallisto), file(geneTransMap) from transcriptomeGeneTransMapKallisto
+    set val(assemblerKallisto), file(transcriptomeKallisto), file(geneTransMap) from transcriptomeGeneTransMapKallisto
     file relativeSamples from relativeSamples_toKallisto
   output:
     file "kallisto.isoform.TPM.not_cross_norm" into rawKallistoTable
     file "kallisto.isoform.TMM.EXPR.matrix" optional true into normalizedKallistoTable
     file "kallisto.gene.TPM.not_cross_norm" 
     file "kallisto.gene.TMM.EXPR.matrix" optional true
+  tag { dateMetadataPrefix+"${assemblerKallisto}" }
   script:
     """
     export TRINITY_HOME=\$(dirname `which Trinity`)
@@ -446,13 +446,13 @@ normalizedKallistoTable
 process trinityStats {
   publishDir "transXpress_results", mode: "copy"
   cpus 1
-  tag { assemblyPrefix }
   input:
     set val(assemblerStats), file(transcriptomeStats) from transcriptomeToStats
     file expressionStats
   output:
     file "transcriptome_stats.txt"
     file "transcriptome_exN50.plot.pdf"
+  tag { dateMetadataPrefix+"${assemblerStats}" }
   script:
     """
     export TRINITY_HOME=\$(dirname `which Trinity`)
@@ -480,7 +480,7 @@ process sprotBlastxParallel {
     set sprotDb, sprotDbIndex from sprotDb
   output:
     file "blastx_out" into sprotBlastxResults
-  tag { assemblyPrefix+"-"+chunk }
+  tag { chunk }
   script:
     """
     echo blastx ${chunk} using database ${sprotDb}
@@ -496,7 +496,7 @@ process sprotBlastpParallel {
     set sprotDb, sprotDbIndex from sprotDb
   output:
     file "blastp_out" into sprotBlastpResults
-  tag { assemblyPrefix+"-"+chunk }
+  tag { dateMetadataPrefix+"-"+chunk }
   script:
     """
     echo blastp ${chunk} using database ${sprotDb}
@@ -515,7 +515,7 @@ process pfamParallel {
   output:
     file "pfam_out" into pfamResults
     file "pfam_dom_out" into pfamDomResults
-  tag { assemblyPrefix+"-"+chunk }
+  tag { dateMetadataPrefix+chunk }
   script:
     """
     echo pfam ${chunk} using database ${pfamDb}
@@ -534,7 +534,7 @@ process rfamParallel {
   output:
     file "rfam_out" into rfamResults
     //file "rfam_dom_out" into rfamDomResults
-  tag { assemblyPrefix+"-"+chunk }
+  tag { dateMetadataPrefix+"-"+chunk }
   script:
     """
     echo rfam ${chunk} using database ${rfamDb}
@@ -549,7 +549,7 @@ process publishRfamResults {
     file rfamResult from rfamResults.collectFile(name: 'rfam_annotations_unsorted.txt')
   output:
     file "rfam_annotations.txt" into rfamResultPub
-  tag { assemblyPrefix }
+  tag { dateMetadataPrefix }
   script:
   """
   cat ${rfamResult} | head -n 2 > header.txt
@@ -560,16 +560,16 @@ process publishRfamResults {
 
 process transdecoderPredict {
   publishDir "transXpress_results", mode: "copy" // , saveAs: { filename -> "transcriptome_after_predict.pep" }
-  tag { assemblyPrefix }
   input:
-    set val(transcriptomeName),file(transcriptomeFile) from transcriptomeTransdecoderPredict
-    file "${transcriptomeName}.transdecoder_dir/*" from transdecoderLongOrfsDirFiles
-    file "${transcriptomeName}.transdecoder_dir.__checkpoints_longorfs/*" from longOrfsCheckpointsFiles
+    set val(assembler),file(transcriptomeFile) from transcriptomeTransdecoderPredict
+    file "${transcriptomeFile}.transdecoder_dir/*" from transdecoderLongOrfsDirFiles
+    file "${transcriptomeFile}.transdecoder_dir.__checkpoints_longorfs/*" from longOrfsCheckpointsFiles
     file longOrfsRootCmds 
     file blastpForTransdecoder
     file pfamForTransdecoder
   output:
-    file "${transcriptomeName}.transdecoder.pep" into predictProteome, predictProteomeSplitBy100,predictProteomeSplitBy10
+    file "${transcriptomeFile}.transdecoder.pep" into predictProteome, predictProteomeSplitBy100,predictProteomeSplitBy10
+  tag { dateMetadataPrefix+"${assembler}" }
   script:
     """
     TransDecoder.Predict -t ${transcriptomeFile} --retain_pfam_hits ${pfamForTransdecoder} --retain_blastp_hits ${blastpForTransdecoder}
@@ -578,7 +578,7 @@ process transdecoderPredict {
 
 predictProteomeSplitBy100
   .splitFasta(by: 100, file: true)
-  .into { tmhmmChunks }
+  .set{ tmhmmChunks }
 
 predictProteomeSplitBy10
   .splitFasta(by: 10, file: true)
@@ -589,7 +589,7 @@ process deeplocParallel {
     file chunk from deeplocChunks
   output:
     file "${chunk}.out.txt" into deeplocResults
-  tag { assemblyPrefix+"-"+chunk }
+  tag { chunk }
   script:
     """
     export MKL_THREADING_LAYER=GNU
@@ -605,7 +605,7 @@ process tmhmmParallel {
     file chunk from tmhmmChunks
   output:
     file "tmhmm_out" into tmhmmResults
-  tag { assemblyPrefix+"-"+chunk }
+  tag { chunk }
   script:
     """
     echo tmhmm ${chunk}
@@ -628,8 +628,8 @@ process annotatedFasta {
     file tmhmmResult from tmhmmResults.collectFile(name: 'tmhmm_annotations.tsv')
   output:
     //TODO: Fix this output names, so they are unique across different assemblers
-    file assemblyPrefix+"_annotated.fasta" into transcriptome_annotated_fasta_ch
-    file assemblyPrefix+"_annotated.pep" into transcriptome_annotated_pep_ch
+    file "${dateMetadataPrefix}${assemblyAnnotation}.transcripts_annotated.fasta" into transcriptome_annotated_fasta_ch
+    file "${dateMetadataPrefix}${assemblyAnnotation}.proteins_annotated.fasta" into transcriptome_annotated_pep_ch
     file "transcriptome_TPM_blast.csv"
     file "${blastxResult}"
     file "${blastpResult}"
@@ -637,7 +637,7 @@ process annotatedFasta {
     file "${pfamDomResult}"
     file "${deeplocResult}"
     file "${tmhmmResult}"
-  tag { assemblyPrefix }
+  tag { dateMetadataPrefix+"${assemblyAnnotation}" }
   script:
     """
     #!/usr/bin/env python
@@ -707,7 +707,7 @@ process annotatedFasta {
     
     ## Do the work
     print ("Annotating FASTA file ${transcriptomeFile}")
-    with open("${transcriptomeFile}", 'r') as input_fasta_handle, open("${assemblyPrefix}_annotated.fasta", 'w') as output_fasta_handle:
+    with open("${transcriptomeFile}", 'r') as input_fasta_handle, open("${dateMetadataPrefix}${assemblyAnnotation}.transcripts_annotated.fasta", 'w') as output_fasta_handle:
       for record in Bio.SeqIO.parse(input_fasta_handle, "fasta"):
         transcript_id = record.id
         record.description = "TPM: " + expression_annotations.get(transcript_id)
@@ -716,7 +716,7 @@ process annotatedFasta {
         Bio.SeqIO.write(record, output_fasta_handle, "fasta")
     
     print ("Annotating FASTA file ${proteomeFile}")
-    with open("${proteomeFile}", 'r') as input_fasta_handle, open("${assemblyPrefix}_annotated.pep", 'w') as output_fasta_handle:
+    with open("${proteomeFile}", 'r') as input_fasta_handle, open("${dateMetadataPrefix}${assemblyAnnotation}.proteins_annotated.fasta", 'w') as output_fasta_handle:
       for record in Bio.SeqIO.parse(input_fasta_handle, "fasta"):
         transcript_id = re.sub("\\.p[0-9]+\$", "", record.id)
         record.description = "transdecoder " + re.search("ORF type:[^,]+,score=[^,]+", record.description).group(0)
@@ -760,7 +760,7 @@ process final_checksum {
         file "transcriptome_annotated.pep" from transcriptome_annotated_pep_ch1
     output:
         file "assembly_seq-dependent_checksums.txt"
-    tag { assemblyPrefix }
+    tag { dateMetadataPrefix }
     script:
     """
     echo -n "transcriptome_annotated.fasta:" > assembly_seq-dependent_checksums.txt
