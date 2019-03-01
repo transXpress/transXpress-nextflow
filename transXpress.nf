@@ -361,7 +361,7 @@ input:
    file datasets_YAML from yaml_rnaSPAdes_ch
    //file filteredSingleReads from filteredSingleReads_ch2.collect()
 output:
-   set val("rnaSPAdes"), file("rnaSPAdes.gene_trans_map"),file(dateMetadataPrefix+"_rnaSPAdes/transcripts.fasta") into rnaSPAdesFinalOutput
+   set val("rnaSPAdes"), file("rnaSPAdes.gene_trans_map"),file(dateMetadataPrefix+"rnaSPAdes/transcripts.fasta") into rnaSPAdesFinalOutput
 script:
 """
 rnaspades.py --dataset ${datasets_YAML} -t ${task.cpus} -m ${task.memory.toGiga()} -o ${dateMetadataPrefix}rnaSPAdes --only-assembler -k 47
@@ -534,7 +534,7 @@ process rfamParallel {
   output:
     file "rfam_out" into rfamResults
     //file "rfam_dom_out" into rfamDomResults
-  tag { dateMetadataPrefix+"-"+chunk }
+  tag { chunk }
   script:
     """
     echo rfam ${chunk} using database ${rfamDb}
