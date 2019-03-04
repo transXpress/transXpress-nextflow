@@ -211,7 +211,8 @@ fastqc ${R1_reads} &
 fastqc ${R2_reads}
 
 ##Check for bad run
-
+cat ${R1_reads}.html | grep -oe "\[FAIL\].{1,30}Per base sequence quality" > ${R1_reads}.fastqc.fail &
+cat ${R2_reads}.html | grep -oe "\[FAIL\].{1,30}Per base sequence quality" > ${R2_reads}.fastqc.fail
 ##If no bad run, produce the .fastqc.ok files
 
 ##Dummy output for now
