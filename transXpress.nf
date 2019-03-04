@@ -143,13 +143,23 @@ output:
     file "relative_samples.txt" into relativeSamples_ch
 script:
 """
-while read LINE; do
-  START=\$(echo "\$LINE" | cut -f 1,2)
-  FORWARD=\$(echo "\$LINE" | cut -f 3 | sed -r 's/[\\/\\.].+\\///g')".R1-P.qtrim.fastq.gz"
-  REVERSE=\$(echo "\$LINE" | cut -f 4 | sed -r 's/[\\/\\.].+\\///g')".R2-P.qtrim.fastq.gz"
-  echo \$FORWARD \$REVERSE
-  echo "\${START}\t\${FORWARD}\t\${REVERSE}" >> relative_samples.txt
-done < samples.txt
+#!/usr/bin/env python
+import re
+import path
+
+output_handle = open("relative_samples.txt", "w")
+
+with open("${toRelative}", "r") as input_handle:
+      for line in input_handle:
+        row = re.split("[\t ]+", line)
+        newRow = [row[0],row[1]]
+        forwardReads = os.path.basename(row[2])+".R1-P.qtrim.fastq.gz"        
+        reverseReads = os.path.basename(row[3])+".R2-P.qtrim.fastq.gz"        
+        newRow.append(forwardReads)
+        newRow.append(reverseReads)
+        newRowString = "\t".join(newRow)
+        output_handle.write(newRowString)
+output_handle.close()        
 """
 }
 relativeSamples_ch.into{ samples_file_toTrinity; relativeSamples_toTrinityFinish; relativeSamples_toKallisto; samples_file_toYAMLConvert}
