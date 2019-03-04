@@ -6,19 +6,35 @@
  * - samples.txt must contain complete (absolute) paths to read files
  */
 
+theDate = ""
+if ( params.prefix_add_date == true) {
+theDate = new java.util.Date().format( params.prefix_add_date_formatting ) //yyMMdd by default
+}
 
-params.tempdir = "/lab/weng_scratch/tmp/"
 
-theDate = new java.util.Date().format( 'MMdd' )
-
-theText = file(params.species).text
+metadata = ""
+if ( params.prefix_add_metadata_file != "" ) {
+theText = file(params.prefix_add_metadata_file).text
 metadata = theText.replace(" ","_").trim()
-dateMetadataPrefix = theDate+"_"+metadata+"_"
+}
+
+dateMetadataToJoin = []
+if (theDate != "") {
+dateMetadataToJoin.add(theDate)
+}
+if (metadata != "") {
+dateMetadataToJoin.add(metadata)
+}
+
+dateMetadataPrefix = dateMetadataToJoin.join("_")
+if (dateMetadataPrefix != "") {
+  dateMetadataPrefix += "_"
+}
 
 log.info """
  transXpress
  ===================================
- """+theDate+"_"+metadata+" assembling with "+params.assembler
+ """+dateMetadataPrefix+" assembling with "+params.assembler
 
 
 /*
@@ -27,19 +43,20 @@ log.info """
 
 process downloadEggNOG {
   executor 'local'
-  storeDir '/lab/solexa_weng/tmp/db'
+  storeDir params.storeDB
   output:
     file "NOG.annotations.tsv" into eggNOGDb
   script:
     """
     wget "http://eggnogdb.embl.de/download/latest/data/NOG/NOG.annotations.tsv.gz"
     gunzip NOG.annotations.tsv.gz
+    sleep 5 ##Nextflow doesn't handle filesystem latency well, so this is a bandaid
     """
 }
 
 process downloadVirusesUniref50 {
   executor 'local'
-  storeDir '/lab/solexa_weng/tmp/db'
+  storeDir params.storeDB
   errorStrategy 'ignore'
   output:
     set file("virusesUniref50.pep.fasta"), file("virusesUniref50.pep.fasta.p??") into virusDb
@@ -48,12 +65,13 @@ process downloadVirusesUniref50 {
     wget -t 3 -O virusesUniref50.pep.fasta.gz "https://www.uniprot.org/uniref/?query=uniprot%3A%28taxonomy%3A%22Viruses+%5B10239%5D%22%29+AND+identity%3A0.5&format=fasta&compress=yes"
     gunzip virusesUniref50.pep.fasta.gz
     makeblastdb -in virusesUniref50.pep.fasta -dbtype prot
+    sleep 5
     """
 }
 
 process downloadRfam {
   executor 'local'
-  storeDir '/lab/solexa_weng/tmp/db'
+  storeDir params.storeDB
   output:
     set file("Rfam.cm"), file("Rfam.cm.???") into rfamDb
   script:
@@ -66,7 +84,7 @@ process downloadRfam {
 
 process downloadSprot {
   executor 'local'
-  storeDir '/lab/solexa_weng/tmp/db'
+  storeDir params.storeDB
   output:
     set file("uniprot_sprot.fasta"), file("uniprot_sprot.fasta.p??") into sprotDb
   script:
@@ -79,7 +97,7 @@ process downloadSprot {
 
 process downloadPfam {
   executor 'local'
-  storeDir '/lab/solexa_weng/tmp/db'
+  storeDir params.storeDB
   output:
     set file("Pfam-A.hmm"), file("Pfam-A.hmm.h??") into pfamDb
   script:
@@ -107,17 +125,20 @@ output:
   file "samples.txt" into toParse, toRelative
 script:
 """
-##just do nothing. This process is so the dag looks nicer
+##do nothing. This process is just so the dag looks nicer
 """
 }
+//Load samples into filepair tuples.
 toParse.splitCsv(sep:'\t',header:false)
      .map{ row ->
      println row
      return tuple(file(row[2]), file(row[3])) }
      .set{ readPairs_ch }
 
+
 readPairs_ch.into{ trimReadPairs_ch ; fastqcReadPairs_ch }
 
+//Once the sample files are loaded into Nextflow channels, everything should be specified relatively
 process convertSamplesToRelative {
 executor 'local'
 input:
@@ -137,22 +158,25 @@ done < samples.txt
 }
 relativeSamples_ch.into{ samples_file_toTrinity; relativeSamples_toTrinityFinish; relativeSamples_toKallisto; samples_file_toYAMLConvert}
 
+
 process trimmomatic {
 cpus 4
 input:
  set file(R1_reads),file(R2_reads) from trimReadPairs_ch
+ file "adapters.fasta" from file(params.trimmomatic_adapter_file)
 tag {"$R1_reads"+" and " +"$R2_reads"}
 output:
   set file("${R1_reads}.R1-P.qtrim.fastq.gz"), file("${R2_reads}.R2-P.qtrim.fastq.gz") into filteredPairedReads_toChoice,filteredPairedReads_toKallisto
   //file "*U.qtrim.fastq.gz" into filteredSingleReads
 script:
 """
-java -jar /lab/solexa_weng/testtube/trinityrnaseq-Trinity-v2.8.4/trinity-plugins/Trimmomatic/trimmomatic.jar PE -threads ${task.cpus}  ${R1_reads} ${R2_reads} ${R1_reads}.R1-P.qtrim.fastq.gz ${R1_reads}.R1-U.qtrim.fastq.gz ${R2_reads}.R2-P.qtrim.fastq.gz ${R2_reads}.R2-U.qtrim.fastq.gz  ILLUMINACLIP:/lab/solexa_weng/testtube/trinityrnaseq-Trinity-v2.8.4/trinity-plugins/Trimmomatic/adapters/TruSeq3-PE.fa:2:30:10 SLIDINGWINDOW:4:5 LEADING:5 TRAILING:5 MINLEN:25 
+##Adjust the params.TRIMMOMATIC_PARAMS in the nextflow.config file to change the parameters  
+trimmomatic PE -threads ${task.cpus} ${R1_reads} ${R2_reads} ${R1_reads}.R1-P.qtrim.fastq.gz ${R1_reads}.R1-U.qtrim.fastq.gz ${R2_reads}.R2-P.qtrim.fastq.gz ${R2_reads}.R2-U.qtrim.fastq.gz ${params.TRIMMOMATIC_PARAMS} 
 """
 }
 filteredPairedReads_toTrinity = Channel.create()
 filteredPairedReads_toRnaspades = Channel.create()
-filteredPairedReads_toChoice.choice(filteredPairedReads_toTrinity,filteredPairedReads_toRnaspades) { params.assembler =~ /rinity/ ? 0 : 1 }
+filteredPairedReads_toChoice.choice(filteredPairedReads_toTrinity,filteredPairedReads_toRnaspades) { params.assembler.toLowerCase() =~ /trinity/ ? 0 : 1 }
 
 filteredPairedReads_toTrinity.collect().into{ trinityInchwormPairedReads ; trinityFinishPairedReads }
 
@@ -239,7 +263,6 @@ script:
 
 process trinityInchwormChrysalis {
   cache 'lenient'
-  label = "nf_"+dateMetadataPrefix+"_trinityInchwormChrysalis"
 
   cpus 12
   memory "200 GB"
@@ -378,7 +401,7 @@ process renameAssembly {
    publishDir "transXpress_results", mode: "copy"
    input:
     set val(assembler), file(geneTransMap), file(transcriptome_fasta) from finishedAssemblies
-    file "species.txt" from file(params.species) //Just a dummy input
+    file "species.txt" from file(params.prefix_add_metadata_file) //Just a dummy input to include the file on the DAG
    output:
     file "${dateMetadataPrefix}${assembler}.transcripts.fasta" into transcriptomeToSplit 
     set assembler, file("${dateMetadataPrefix}${assembler}.transcripts.fasta") into transcriptomeToTransdecoder, transcriptomeToStats, transcriptomeToAnnotation //Also pass the assembler type along
