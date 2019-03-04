@@ -11,7 +11,6 @@ if ( params.prefix_add_date == true) {
 theDate = new java.util.Date().format( params.prefix_add_date_formatting ) //yyMMdd by default
 }
 
-
 metadata = ""
 if ( params.prefix_add_metadata_file != "" ) {
 theText = file(params.prefix_add_metadata_file).text
@@ -50,7 +49,6 @@ process downloadEggNOG {
     """
     wget "http://eggnogdb.embl.de/download/latest/data/NOG/NOG.annotations.tsv.gz"
     gunzip NOG.annotations.tsv.gz
-    sleep 5 ##Nextflow doesn't handle filesystem latency well, so this is a bandaid
     """
 }
 
@@ -65,7 +63,6 @@ process downloadVirusesUniref50 {
     wget -t 3 -O virusesUniref50.pep.fasta.gz "https://www.uniprot.org/uniref/?query=uniprot%3A%28taxonomy%3A%22Viruses+%5B10239%5D%22%29+AND+identity%3A0.5&format=fasta&compress=yes"
     gunzip virusesUniref50.pep.fasta.gz
     makeblastdb -in virusesUniref50.pep.fasta -dbtype prot
-    sleep 5
     """
 }
 
@@ -135,7 +132,6 @@ toParse.splitCsv(sep:'\t',header:false)
      return tuple(file(row[2]), file(row[3])) }
      .set{ readPairs_ch }
 
-
 readPairs_ch.into{ trimReadPairs_ch ; fastqcReadPairs_ch }
 
 //Once the sample files are loaded into Nextflow channels, everything should be specified relatively
@@ -174,9 +170,18 @@ script:
 trimmomatic PE -threads ${task.cpus} ${R1_reads} ${R2_reads} ${R1_reads}.R1-P.qtrim.fastq.gz ${R1_reads}.R1-U.qtrim.fastq.gz ${R2_reads}.R2-P.qtrim.fastq.gz ${R2_reads}.R2-U.qtrim.fastq.gz ${params.TRIMMOMATIC_PARAMS} 
 """
 }
+
+///This switch controls which assembler is executed.
 filteredPairedReads_toTrinity = Channel.create()
 filteredPairedReads_toRnaspades = Channel.create()
-filteredPairedReads_toChoice.choice(filteredPairedReads_toTrinity,filteredPairedReads_toRnaspades) { params.assembler.toLowerCase() =~ /trinity/ ? 0 : 1 }
+filteredPairedReads_toChoice.choice(filteredPairedReads_toTrinity,filteredPairedReads_toRnaspades) { assemblerString = params.assembler.toLowerCase().trim()
+                                                                                                     if (assemblerString == "trinity") return 0
+                                                                                                     else if (assemblerString == "rnaspades") return 1
+                                                                                                     else {
+                                                                                                      println "Error:"+params.assembler+" doesn't match an implemented assembler"
+                                                                                                      return -1 //Error status
+                                                                                                      }
+                                                                                                      }
 
 filteredPairedReads_toTrinity.collect().into{ trinityInchwormPairedReads ; trinityFinishPairedReads }
 
