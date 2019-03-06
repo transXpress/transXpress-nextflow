@@ -211,12 +211,15 @@ fastqc ${R1_reads} &
 fastqc ${R2_reads}
 
 ##Check for bad run
-cat *.html | grep -oe "\\[FAIL\\].{1,30}Per base sequence quality" > fastqc.fail
+cat *.html | grep -oe "\\[FAIL\\].{1,30}Per sequence quality scores" > fastqc.fail
 ##If no bad run, produce the .fastqc.ok files
 if ! [[ -s fastqc.fail ]]
 then
 touch ${R1_reads}.fastqc.ok
 touch ${R2_reads}.fastqc.ok
+else
+echo "Error. FastQC detected a failure in the per read sequencing quality. This possibly indicates a bad sequencing run, which would result in a poor transcriptome assembly. Please solve the quality issue in your raw read files provided in samples.txt"
+exit 1
 fi
 
 sleep 15 ##Not a super important process, so might as well put in a delay to help with filesystem latency issues.
