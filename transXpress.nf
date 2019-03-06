@@ -442,6 +442,9 @@ process transdecoderLongOrfs {
     set val(assemblerName),file(transcriptomeTransdecoder) from transcriptomeToTransdecoder
   output:
     file "${transcriptomeTransdecoder}.transdecoder_dir/*.pep" into longOrfsProteomeSplit
+    file "${transcriptomeTransdecoder}.transdecoder_dir/*.cds"
+    file "${transcriptomeTransdecoder}.transdecoder_dir/*.bed"
+    file "${transcriptomeTransdecoder}.transdecoder_dir/*.gff3"
     file "${transcriptomeTransdecoder}.transdecoder_dir/*" into transdecoderLongOrfsDirFiles
     file "${transcriptomeTransdecoder}.transdecoder_dir.__checkpoints_longorfs/*" into longOrfsCheckpointsFiles
     file "*.cmds" into longOrfsRootCmds
