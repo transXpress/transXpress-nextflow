@@ -211,13 +211,14 @@ fastqc ${R1_reads} &
 fastqc ${R2_reads}
 
 ##Check for bad run
-cat ${R1_reads}.html | grep -oe "\[FAIL\].{1,30}Per base sequence quality" > ${R1_reads}.fastqc.fail &
-cat ${R2_reads}.html | grep -oe "\[FAIL\].{1,30}Per base sequence quality" > ${R2_reads}.fastqc.fail
+cat *.html | grep -oe "\\[FAIL\\].{1,30}Per base sequence quality" > fastqc.fail
 ##If no bad run, produce the .fastqc.ok files
-
-##Dummy output for now
+if [ ! -s fastqc.fail ]
+then
 touch ${R1_reads}.fastqc.ok
 touch ${R2_reads}.fastqc.ok
+fi
+
 sleep 15 ##Not a super important process, so might as well put in a delay to help with filesystem latency issues.
 """
 }
