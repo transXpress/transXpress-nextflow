@@ -213,7 +213,7 @@ fastqc ${R2_reads}
 ##Check for bad run
 cat *.html | grep -oe "\\[FAIL\\].{1,30}Per base sequence quality" > fastqc.fail
 ##If no bad run, produce the .fastqc.ok files
-if [ ! -s fastqc.fail ]
+if ! [[ -s fastqc.fail ]]
 then
 touch ${R1_reads}.fastqc.ok
 touch ${R2_reads}.fastqc.ok
