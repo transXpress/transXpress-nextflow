@@ -211,7 +211,7 @@ fastqc ${R1_reads} &
 fastqc ${R2_reads}
 
 ##Check for bad run
-cat *.html | grep -oe "\\[FAIL\\].{1,30}Per sequence quality scores" > fastqc.fail
+#cat *.html | grep -oe "\\[FAIL\\].{1,30}Per sequence quality scores" > fastqc.fail
 ##If no bad run, produce the .fastqc.ok files
 
 #if [[ ! -s fastqc.fail ]]
@@ -450,9 +450,6 @@ process transdecoderLongOrfs {
     set val(assemblerName),file(transcriptomeTransdecoder) from transcriptomeToTransdecoder
   output:
     file "${transcriptomeTransdecoder}.transdecoder_dir/*.pep" into longOrfsProteomeSplit
-    file "${transcriptomeTransdecoder}.transdecoder_dir/*.cds"
-    file "${transcriptomeTransdecoder}.transdecoder_dir/*.bed"
-    file "${transcriptomeTransdecoder}.transdecoder_dir/*.gff3"
     file "${transcriptomeTransdecoder}.transdecoder_dir/*" into transdecoderLongOrfsDirFiles
     file "${transcriptomeTransdecoder}.transdecoder_dir.__checkpoints_longorfs/*" into longOrfsCheckpointsFiles
     file "*.cmds" into longOrfsRootCmds
@@ -522,7 +519,7 @@ transcriptomeToSplit
 
 longOrfsProteomeSplit
   .splitFasta(by: 100, file: true)
-  .into { sprotBlastpChunks; pfamChunks }
+  .into { sprotBlastpChunks; transdecoderPfamChunks }
 
 
 process sprotBlastxParallel {
@@ -562,11 +559,12 @@ sprotBlastpResults.collectFile(name: 'blastp_annotations.tsv').into { blastpForT
 process pfamParallel {
   cpus 2
   input:
-    file chunk from pfamChunks
+    file chunk from transdecoderPfamChunks
     set pfamDb, pfamDbIndex from pfamDb
   output:
     file "pfam_out" into pfamResults
     file "pfam_dom_out" into pfamDomResults
+    set file("${chunk}"),file("${"pfam_dom_out"}") into revisePfamChunks
   tag { dateMetadataPrefix+chunk }
   script:
     """
@@ -621,12 +619,17 @@ process transdecoderPredict {
     file pfamForTransdecoder
   output:
     file "${transcriptomeFile}.transdecoder.pep" into predictProteome, predictProteomeSplitBy100,predictProteomeSplitBy10
+    file "${transcriptomeFile}.transdecoder.bed"
+    file "${transcriptomeFile}.transdecoder.cds"
+    file "${transcriptomeFile}.transdecoder.gff3"
   tag { dateMetadataPrefix+"${assembler}" }
   script:
     """
     TransDecoder.Predict -t ${transcriptomeFile} --retain_pfam_hits ${pfamForTransdecoder} --retain_blastp_hits ${blastpForTransdecoder}
     """
 }
+
+predictProteome.into{ proteomeToAnnotation ; proteomeToPfamRevise }
 
 predictProteomeSplitBy100
   .splitFasta(by: 100, file: true)
@@ -635,6 +638,35 @@ predictProteomeSplitBy100
 predictProteomeSplitBy10
   .splitFasta(by: 10, file: true)
   .set{ deeplocChunks }
+
+
+proteomeToPfamRevise.combine(revisePfamChunks).set{ combinedToPfamRevise }
+
+process revisePfamResults {
+input:
+ set file(proteome),file(longOrfChunk) from combinedToPfamRevise
+output:
+ file "test.txt"
+tag { dateMetadataPrefix+"${longOrfChunk}" }
+script:
+"""
+seqkit fx2tab -n -i ${longOrfChunk} | cut -f 1 > ids.txt
+seqkit grep -f ids.txt ${proteome} > predict_subset.fasta
+seqkit grep -s -f <(seqkit seq -s ${longOrfChunk}) predict_subset.fasta > common.fasta
+
+predictLen=`cat predict_subset.fasta | grep ">" | wc -l`
+commonLen=`cat common.fasta | grep ">" | wc -l`
+if [ \$predictLen -eq \$commonLen ]
+then
+      echo "no changes between the longorfs and transdecoder predict versions"
+      touch test.txt
+else
+      echo "changes detected"
+fi
+
+
+"""
+}
 
 process deeplocParallel {
   input:
@@ -670,7 +702,7 @@ process annotatedFasta {
   publishDir "transXpress_results", mode: "copy"
   input:
     set val(assemblyAnnotation),file(transcriptomeFile) from transcriptomeToAnnotation
-    file proteomeFile from predictProteome
+    file proteomeFile from proteomeToAnnotation
     file kallistoFile from transcriptExpression
     file blastxResult
     file blastpResult 
