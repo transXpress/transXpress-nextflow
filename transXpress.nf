@@ -618,7 +618,7 @@ process transdecoderPredict {
     file blastpForTransdecoder
     file pfamForTransdecoder
   output:
-    file "${transcriptomeFile}.transdecoder.pep" into predictProteome, predictProteomeSplitBy100,predictProteomeSplitBy10
+    file "${transcriptomeFile}.transdecoder.pep" into predictProteome, predictProteomeSplitBy100
     file "${transcriptomeFile}.transdecoder.bed"
     file "${transcriptomeFile}.transdecoder.cds"
     file "${transcriptomeFile}.transdecoder.gff3"
@@ -633,12 +633,7 @@ predictProteome.into{ proteomeToAnnotation ; proteomeToPfamRevise }
 
 predictProteomeSplitBy100
   .splitFasta(by: 100, file: true)
-  .set{ tmhmmChunks }
-
-predictProteomeSplitBy10
-  .splitFasta(by: 10, file: true)
-  .set{ deeplocChunks }
-
+  .set{ tmhmmChunks ; deeplocChunks }
 
 proteomeToPfamRevise.combine(revisePfamChunks).set{ combinedToPfamRevise }
 
