@@ -633,7 +633,7 @@ predictProteome.into{ proteomeToAnnotation ; proteomeToPfamRevise }
 
 predictProteomeSplitBy100
   .splitFasta(by: 100, file: true)
-  .set{ tmhmmChunks ; deeplocChunks }
+  .into{ tmhmmChunks ; deeplocChunks }
 
 proteomeToPfamRevise.combine(revisePfamChunks).set{ combinedToPfamRevise }
 
