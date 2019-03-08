@@ -6,6 +6,19 @@
  * - samples.txt must contain complete (absolute) paths to read files
  */
 
+//This ensures that if the workflow is rerun on a different day from the same input files, then 
+//it doesn't recalculate the assembly_prefix
+def outFile = new File('transXpress_results/assembly_prefix.txt')
+if ( ! outFile.exists() )
+{
+
+def resultsDir = new File('transXpress_results') 
+if ( ! resultsDir.exists())
+{
+resultsDir.mkdirs() //Make the transXpress_results directory
+}
+
+
 theDate = ""
 if ( params.prefix_add_date == true) {
 theDate = new java.util.Date().format( params.prefix_add_date_formatting ) //yyMMdd by default
@@ -30,11 +43,19 @@ if (dateMetadataPrefix != "") {
   dateMetadataPrefix += "_"
 }
 
+
+outFile.withWriter('UTF-8') { writer ->
+    writer.write(dateMetadataPrefix)
+}
+}
+
+//Convert into a global string variable
+dateMetadataPrefix = outFile.text
+
 log.info """
  transXpress
  ===================================
  """+dateMetadataPrefix+" assembling with "+params.assembler
-
 
 /*
  * Step 0 Download reference databases
@@ -573,7 +594,7 @@ process pfamParallel {
     """
 }
 pfamResults.collectFile(name: 'pfam_annotations.txt').set { pfamResult }
-pfamDomResults.collectFile(name: 'pfam_dom_annotations.txt').into { pfamDomResult ; pfamForTransdecoder }
+pfamDomResults.collectFile(name: 'pfam_dom_annotations.txt').into { pfamDomResult ; pfamForTransdecoder ; pfamToGff3Doms}
 
 
 process rfamParallel {
@@ -621,7 +642,7 @@ process transdecoderPredict {
     file "${transcriptomeFile}.transdecoder.pep" into predictProteome, predictProteomeSplitBy100
     file "${transcriptomeFile}.transdecoder.bed"
     file "${transcriptomeFile}.transdecoder.cds"
-    file "${transcriptomeFile}.transdecoder.gff3"
+    file "${transcriptomeFile}.transdecoder.gff3" into transdecoderGFF3ToPfam, transdecoderGFF3ToLiftover
   tag { dateMetadataPrefix+"${assembler}" }
   script:
     """
@@ -633,13 +654,14 @@ predictProteome.into{ proteomeToAnnotation ; proteomeToPfamRevise }
 
 predictProteomeSplitBy100
   .splitFasta(by: 100, file: true)
-  .into{ tmhmmChunks ; deeplocChunks }
+  .into{ tmhmmChunks ; deeplocChunks ; signalpChunks }
+signalpChunks.into{ signalp4Chunks ; signalp5Chunks}
 
 proteomeToPfamRevise.combine(revisePfamChunks).set{ combinedToPfamRevise }
 
 process revisePfamResults {
 input:
- set file(proteome),file(longOrfChunk) from combinedToPfamRevise
+ set file(proteome),file(longOrfChunk),file(hmmerscanDomFile) from combinedToPfamRevise
 output:
  file "test.txt"
 tag { dateMetadataPrefix+"${longOrfChunk}" }
@@ -662,6 +684,52 @@ fi
 
 """
 }
+
+process pfamToGff3 {
+publishDir "transXpress_results", mode: "copy"
+
+input:
+file pfamDomResult from pfamToGff3Doms
+file refGFF3 from transdecoderGFF3ToPfam
+
+output:
+file "pfam_domains.gff3"
+tag { "$refGFF3" }
+script:
+"""
+python ../../../pfam2gff.py -g ${refGFF3} -i ${pfamDomResult} -T > pfam_domains.gff3
+"""
+}
+
+
+process signalp4Parallel {
+  cpus 1
+  input:
+    file chunk from signalp4Chunks
+  output:
+    file "signalp_out" into signalp4Results
+  tag { chunk }
+  script:
+    """
+    signalp -t ${params.SIGNALP_ORGANISMS} -f short ${chunk} > signalp_out
+    """
+}
+
+process signalp5Parallel {
+  cpus 1
+  input:
+    file chunk from signalp5Chunks
+  output:
+    file "*signalp5" into signalp5Results
+    file "*.gff3" into signalp5ResultsGff3
+  tag { chunk }
+  script:
+    """
+    /lab/solexa_weng/testtube/signalp-5.0/bin/signalp -prefix "signalp5_"${chunk} -org ${params.SIGNALP_ORGANISMS} -format short -fasta ${chunk} -gff3
+    """
+}
+signalp5ResultsGff3.collectFile(name: 'signalp5_annotations.gff3').into{ signalp5ResultGff3ToAnnotate ; signalp5ResultGff3ToLiftover}
+
 
 process deeplocParallel {
   input:
@@ -691,6 +759,118 @@ process tmhmmParallel {
     tmhmm --short < ${chunk} > tmhmm_out
     """
 }
+tmhmmResults.collectFile(name: 'tmhmm_annotations.tsv').into{ tmhmmResultToAnnotate ; tmhmmResultToGff3 }
+
+process tmhmmMakeGff3 {
+executor 'local'
+input:
+ file tmhmmResultToGff3
+tag{ dateMetadataPrefix }
+output:
+ file "*.gff3" into tmhmmGff3ToLiftover, tmhmmGff3
+script:
+"""
+#!/usr/bin/env python
+
+import os
+import re
+
+write_handle = open("tmhmm.pep.gff3","w")
+read_handle = open("${tmhmmResultToGff3}","r")
+for line in read_handle.readlines():
+    if line[0] == "#" or len(line.strip()) == 0:
+        continue
+    splitrow = re.split("\\t+",line)
+    protein_id = splitrow[0]
+    topology = splitrow[5]
+    matches = re.findall("([oi][0-9]+-[0-9]+)",topology)
+    for m in matches:
+        type = m[0]
+        start,end = m[1:].split("-")
+        outstring = "\\t".join([protein_id,"tmhmm","transmembrane_region",start,end,".",".",".","."])+os.linesep
+        write_handle.write(outstring)
+read_handle.close()
+write_handle.close()
+"""
+
+}
+
+
+signalp5ResultGff3ToLiftover.mix(tmhmmGff3ToLiftover).set{ combinedGff3s }
+transdecoderGFF3ToLiftover.combine(combinedGff3s.collectFile(name: 'collected.gff3')).set{ liftOverGffsTuple }
+
+process liftoverPeptideGff3ToTranscript {
+executor 'local'
+input:
+ set file(transdecoderGFF3ToLiftover), file(gff3FilesToLiftover) from liftOverGffsTuple
+
+tag { "${gff3FilesToLiftover}"  }
+output:
+ file "liftover.gff3" into liftoverResults
+script:
+"""
+#!/usr/bin/env python
+
+import re
+
+read_handle = open("${transdecoderGFF3ToLiftover}","r")
+transcript_len_dict = dict()
+cds_dict = dict()
+protein_to_transcript = dict()
+transcript_to_protein = dict()
+for line in read_handle.readlines():
+    if line[0] == "#" or len(line.strip()) == 0:
+        continue
+    splitrow = re.split("\t",line)
+    if "gene" == splitrow[2].strip().lower():
+        transcript_len_dict[splitrow[0]] = int(splitrow[4].strip()) ##Length of transcipt.
+    if "CDS" == splitrow[2].strip().upper():
+        transcript_id = splitrow[0]
+        cds_start = int(splitrow[3].strip())
+        cds_end = int(splitrow[4].strip())
+        cds_strand = splitrow[6].strip()
+        ##Note the extra backslash for nextflow
+        protein_id = re.search("ID=cds\\.(.+);",splitrow[8]).group(1)
+        print(protein_id)
+        cds_dict[protein_id] = {"cds_start":cds_start,"cds_end":cds_end,"cds_strand":cds_strand}
+        protein_to_transcript[protein_id] = transcript_id
+        transcript_to_protein[transcript_id] = protein_id
+read_handle.close()
+
+write_handle = open("liftover.gff3","w")
+read_handle = open("${gff3FilesToLiftover}","r")
+for line in read_handle.readlines():
+    if line[0] == "#" or len(line.strip()) == 0:
+        continue
+    splitrow = re.split("\t",line)
+    protein_id = splitrow[0]
+    transcript_id = protein_to_transcript[protein_id]
+    feature_start = int(splitrow[3].strip())
+    feature_stop = int(splitrow[4].strip())
+    feature_strand = splitrow[6].strip()
+    ##For peptide features, as far as I know they are always specificed either as "+" or "."
+
+    if cds_dict[protein_id]["cds_strand"] == "+":
+        new_start = cds_dict[protein_id]["cds_start"] + (feature_start * 3)-3
+        new_stop = cds_dict[protein_id]["cds_start"] + (feature_stop * 3)-3
+        new_strand = "+"
+    elif cds_dict[protein_id]["cds_strand"] == "-":
+        new_start = cds_dict[protein_id]["cds_end"] - (feature_stop * 3)+3 
+        new_stop =  cds_dict[protein_id]["cds_end"] - (feature_start * 3)+3 
+        new_strand = "-"
+    else:
+        ##Note the extra backslash for nextflow
+        sys.stderr.write("Unknown strand\\n")
+        exit(1)
+        ##Note the extra backslash for nextflow
+    outstring = "\\t".join([protein_to_transcript[protein_id],splitrow[1],splitrow[2],str(new_start),str(new_stop),splitrow[5],new_strand,splitrow[7],splitrow[8]])
+    write_handle.write(outstring)
+write_handle.close()
+read_handle.close()
+"""
+}
+liftoverResults.collectFile(name: 'liftover_results.gff3').set{ liftoverResult  }
+
 
 // Collect parallelized annotations
 process annotatedFasta {
@@ -703,19 +883,24 @@ process annotatedFasta {
     file blastpResult 
     file pfamResult 
     file pfamDomResult 
+    file liftoverResult
+    file signalp4Result from signalp4Results.collectFile(name: 'signalp4_annotations.txt')
+    file signalp5Result from signalp5Results.collectFile(name: 'signalp5_annotations.txt')
+    file signalp5ResultGff3ToAnnotate
     file deeplocResult from deeplocResults.collectFile(name: 'deeploc_annotations.txt')
-    file tmhmmResult from tmhmmResults.collectFile(name: 'tmhmm_annotations.tsv')
+    file tmhmmResultToAnnotate
   output:
     //TODO: Fix this output names, so they are unique across different assemblers
     file "${dateMetadataPrefix}${assemblyAnnotation}.transcripts_annotated.fasta" into transcriptome_annotated_fasta_ch
     file "${dateMetadataPrefix}${assemblyAnnotation}.proteins_annotated.fasta" into transcriptome_annotated_pep_ch
     file "transcriptome_TPM_blast.csv"
+    file "${liftoverResult}"
     file "${blastxResult}"
     file "${blastpResult}"
     file "${pfamResult}"
     file "${pfamDomResult}"
     file "${deeplocResult}"
-    file "${tmhmmResult}"
+    file "${tmhmmResultToAnnotate}"
   tag { dateMetadataPrefix+"${assemblyAnnotation}" }
   script:
     """
@@ -769,8 +954,8 @@ process annotatedFasta {
         pfam_annotations[row[2]] = row[1] + " " + row[18] + ", e=" + str(row[7])
 
     ## Load tmhmm results
-    print ("Loading tmhmm predictions from ${tmhmmResult}")
-    with open("${tmhmmResult}") as input_handle:
+    print ("Loading tmhmm predictions from ${tmhmmResultToAnnotate}")
+    with open("${tmhmmResultToAnnotate}") as input_handle:
       csv_reader = csv.reader(input_handle, delimiter='\t')
       for row in csv_reader:
         if (len(row) < 6): continue
