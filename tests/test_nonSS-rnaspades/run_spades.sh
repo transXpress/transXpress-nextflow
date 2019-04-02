@@ -1,3 +1,3 @@
 #! /bin/bash
 
-../../run.sh "rnaspades" "test_nonSS"
+../../run.sh "rnaspades" "test_notStrandSpecific_local"
