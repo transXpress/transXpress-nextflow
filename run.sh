@@ -4,15 +4,15 @@ set -e
 
 if [ $# -lt 1 ]; then
   echo Usage:
-  echo "./run.sh <ASSEMBLER>"
-  echo "where <ASSEMBLER> is either 'trinity' or 'rnaspades'"
+  echo "./run.sh <ASSEMBLER> <PROFILE>" 
+  echo "where <ASSEMBLER> is either 'trinity' or 'rnaspades', and <PROFILE> are the available profiles in nextflow.config"
   exit 1
 fi
 
 if [ $# -gt 1 ]; then
  THEPROFILE=$2
 else
- THEPROFILE="standard"
+ THEPROFILE="notStrandSpecific_local"
 fi
 
 ASSEMBLER=$1
