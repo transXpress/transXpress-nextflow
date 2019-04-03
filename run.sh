@@ -16,9 +16,10 @@ else
 fi
 
 ##Little bit of help for when running internally in Weng lab
-if [ -d "/lab/solexa_weng/testtube/miniconda3/bin" ]; then
-source /lab/solexa_weng/testtube/miniconda3/bin/activate
-fi
+##Note: this doesn't work currently due to this issue: https://github.com/conda/conda/issues/2965
+#if [ -d "/lab/solexa_weng/testtube/miniconda3/bin" ]; then
+#source /lab/solexa_weng/testtube/miniconda3/bin/activate
+#fi
 
 ASSEMBLER=$1
 
