@@ -70,6 +70,8 @@ process downloadEggNOG {
     """
     wget "http://eggnogdb.embl.de/download/latest/data/NOG/NOG.annotations.tsv.gz"
     gunzip NOG.annotations.tsv.gz
+    #echo "Sleeping for 15 seconds to deal with Nextflow issue #931 (https://github.com/nextflow-io/nextflow/issues/931)"
+    #sleep 15
     """
 }
 
@@ -84,6 +86,8 @@ process downloadVirusesUniref50 {
     wget -t 3 -O virusesUniref50.pep.fasta.gz "https://www.uniprot.org/uniref/?query=uniprot%3A%28taxonomy%3A%22Viruses+%5B10239%5D%22%29+AND+identity%3A0.5&format=fasta&compress=yes"
     gunzip virusesUniref50.pep.fasta.gz
     makeblastdb -in virusesUniref50.pep.fasta -dbtype prot
+    #echo "Sleeping for 15 seconds to deal with Nextflow issue #931 (https://github.com/nextflow-io/nextflow/issues/931)"
+    #sleep 15
     """
 }
 
@@ -97,6 +101,8 @@ process downloadRfam {
     wget "ftp://ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/Rfam.cm.gz"
     gunzip Rfam.cm.gz
     cmpress Rfam.cm
+    #echo "Sleeping for 15 seconds to deal with Nextflow issue #931 (https://github.com/nextflow-io/nextflow/issues/931)"
+    #sleep 15
     """
 }
 
@@ -110,6 +116,8 @@ process downloadSprot {
     wget "ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz"
     gunzip uniprot_sprot.fasta.gz
     makeblastdb -in uniprot_sprot.fasta -dbtype prot
+    echo "Sleeping for 15 seconds to deal with Nextflow issue #931 (https://github.com/nextflow-io/nextflow/issues/931)"
+    sleep 15
     """
 }
 
@@ -123,6 +131,8 @@ process downloadPfam {
     wget "ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.hmm.gz"
     gunzip Pfam-A.hmm.gz
     hmmpress Pfam-A.hmm
+    echo "Sleeping for 15 seconds to deal with Nextflow issue #931 (https://github.com/nextflow-io/nextflow/issues/931)"
+    sleep 15
     """
 }
 
@@ -311,8 +321,8 @@ script:
 process trinityInchwormChrysalis {
   cache 'lenient'
 
-  cpus 12
-  memory "200 GB"
+  cpus params.assembly_CPUs
+  memory params.assembly_MEM+" GB"
 
   tag { dateMetadataPrefix+"Trinity" }
 
@@ -423,8 +433,8 @@ process trinityFinish {
 
 
 process runSPAdes {
-cpus 16
-memory "200 GB"
+cpus params.assembly_CPUs
+memory params.assembly_MEM+" GB"
 
 input:
    file filteredPairedReads from filteredPairedReads_toRnaspades.collect()
@@ -485,7 +495,7 @@ process transdecoderLongOrfs {
 
 process kallisto {
   publishDir "transXpress_results", mode: "copy"
-  cpus 10
+  cpus params.assembly_CPUs
   input:
     file filteredReadsFromPairs from filteredPairedReads_toKallisto.collect() //This flattens the tuples
     set val(assemblerKallisto), file(transcriptomeKallisto), file(geneTransMap) from transcriptomeGeneTransMapKallisto
