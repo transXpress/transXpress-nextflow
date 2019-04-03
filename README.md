@@ -36,16 +36,16 @@ Requires
  conda config --add channels r
  conda install nextflow fastqc trimmomatic trinity:2.8.4-0 spades transdecoder biopython samtools bowtie2 infernal hmmer kallisto blast r seqkit
 ~~~
-3. Install deeploc (performance being evaluated by transXpress developers evaluated in comparison to SingalP 4.1/5.0)
+3. Install deeploc (performance being evaluated by transXpress developers in comparison to SingalP 4.1/5.0)
       * Download deeploc from http://www.cbs.dtu.dk/cgi-bin/nph-sw_request?deeploc
       * Install dependencies: `pip install -r requirements.txt`
       * Install deeploc: `python setup.py install` or locally: `python setup.py install --user`
       
-4. Install SignalP 4.1g (performance being evaluated by transXpress developers evaluated in comparison to SingalP 5.0/deeploc)
+4. Install SignalP 4.1g (performance being evaluated by transXpress developers in comparison to SingalP 5.0/deeploc)
       * Download deeploc from http://www.cbs.dtu.dk/cgi-bin/sw_request?signalp+4.1
 
 
-5. Install SignalP 5.0 (performance being evaluated by transXpress developers evaluated in comparison to SingalP 4.1/deeploc)
+5. Install SignalP 5.0 (performance being evaluated by transXpress developers in comparison to SingalP 4.1/deeploc)
       * Download deeploc from http://www.cbs.dtu.dk/cgi-bin/nph-sw_request?signalp
 
 
