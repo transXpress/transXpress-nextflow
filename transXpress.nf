@@ -498,7 +498,7 @@ process kallisto {
   tag { dateMetadataPrefix+"${assemblerKallisto}" }
   script:
     """
-    export TRINITY_HOME=\$(dirname `which Trinity`)
+    export TRINITY_HOME=\$(dirname \$(readlink -f \$(which Trinity)))
     echo TRINITY_HOME set to \${TRINITY_HOME}
     \${TRINITY_HOME}/util/align_and_estimate_abundance.pl --transcripts ${transcriptomeKallisto} ${params.STRAND_SPECIFIC} --seqType fq --samples_file ${relativeSamples} --prep_reference --thread_count ${task.cpus} --est_method kallisto --gene_trans_map ${geneTransMap}
     \${TRINITY_HOME}/util/abundance_estimates_to_matrix.pl --est_method kallisto --name_sample_by_basedir --gene_trans_map $geneTransMap */abundance.tsv
@@ -525,7 +525,7 @@ process trinityStats {
   tag { dateMetadataPrefix+"${assemblerStats}" }
   script:
     """
-    export TRINITY_HOME=\$(dirname `which Trinity`)
+    export TRINITY_HOME=\$(dirname \$(readlink -f \$(which Trinity)))
     echo TRINITY_HOME set to \${TRINITY_HOME}
     \${TRINITY_HOME}/util/TrinityStats.pl ${transcriptomeStats} > transcriptome_stats.txt
     \${TRINITY_HOME}/util/misc/contig_ExN50_statistic.pl ${expressionStats} ${transcriptomeStats} > transcriptome_exN50
@@ -711,7 +711,12 @@ process signalp4Parallel {
   tag { chunk }
   script:
     """
-    signalp -t ${params.SIGNALP_ORGANISMS} -f short ${chunk} > signalp_out
+    if [ -f "" ]; then
+     signalp -t ${params.SIGNALP_ORGANISMS} -f short ${chunk} > signalp_out
+    else
+    echo "Unable to find signalP 4, so making dummy file"
+     touch signalp_out
+    fi
     """
 }
 
@@ -725,7 +730,16 @@ process signalp5Parallel {
   tag { chunk }
   script:
     """
+    
+    ##Weng lab specific stuff for testing
+    if [ -f "/lab/solexa_weng/testtube/signalp-5.0/bin/signalp" ]; then
     /lab/solexa_weng/testtube/signalp-5.0/bin/signalp -prefix "signalp5_"${chunk} -org ${params.SIGNALP_ORGANISMS} -format short -fasta ${chunk} -gff3
+    else
+    echo "Unable to find signalP 5, so making dummy files"
+    touch blank.gff3
+    touch blank.signalp5
+    fi
+    
     """
 }
 signalp5ResultsGff3.collectFile(name: 'signalp5_annotations.gff3').into{ signalp5ResultGff3ToAnnotate ; signalp5ResultGff3ToLiftover}
@@ -739,10 +753,11 @@ process deeplocParallel {
   tag { chunk }
   script:
     """
-    export MKL_THREADING_LAYER=GNU
-    export PATH="/lab/solexa_weng/testtube/miniconda3/bin:$PATH"
-    deeploc -f ${chunk} -o ${chunk}.out
-    ##touch ${chunk}.out.txt
+    ##export MKL_THREADING_LAYER=GNU
+    ##export PATH="/lab/solexa_weng/testtube/miniconda3/bin:$PATH"
+    ##deeploc -f ${chunk} -o ${chunk}.out
+    echo "deeploc disabled"
+    touch ${chunk}.out.txt
     """
 }
 
