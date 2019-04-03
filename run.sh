@@ -15,6 +15,11 @@ else
  THEPROFILE="notStrandSpecific_local"
 fi
 
+##Little bit of help for when running internally in Weng lab
+if [ -d "/lab/solexa_weng/testtube/miniconda3/bin" ]; then
+source /lab/solexa_weng/testtube/miniconda3/bin/activate
+fi
+
 ASSEMBLER=$1
 
 export NXF_ANSI_LOG='false'
