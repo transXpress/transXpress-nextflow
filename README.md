@@ -34,7 +34,7 @@ Requires
  conda config --add channels bioconda
  conda config --add channels conda-forge
  conda config --add channels r
- conda install nextflow fastqc trimmomatic trinity:2.8.4-0 spades transdecoder biopython samtools bowtie2 infernal hmmer kallisto blast r seqkit
+ conda install nextflow fastqc trimmomatic trinity spades transdecoder biopython samtools bowtie2 infernal hmmer kallisto blast r seqkit bioconductor-edger
 ~~~
 3. Install deeploc (performance being evaluated by transXpress developers in comparison to SingalP 4.1/5.0)
       * Download deeploc from http://www.cbs.dtu.dk/cgi-bin/nph-sw_request?deeploc
