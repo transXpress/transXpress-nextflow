@@ -8,7 +8,7 @@ Also see our sister project: [transXpress-snakemake](https://github.com/transXpr
 ## Dependencies
 
 Requires
-* NextFlow 19.02.0+ (install from website)
+* NextFlow 19.01.0+ (install via conda)
 * fastqc (install via conda)
 * trimmomatic (install via conda)
 * Trinity (install via conda)
@@ -34,7 +34,7 @@ Requires
  conda config --add channels bioconda
  conda config --add channels conda-forge
  conda config --add channels r
- conda install snakemake fastqc trimmomatic trinity spades transdecoder biopython samtools bowtie2 infernal hmmer kallisto blast r seqkit
+ conda install nextflow fastqc trimmomatic trinity:2.8.4-0 spades transdecoder biopython samtools bowtie2 infernal hmmer kallisto blast r seqkit
 ~~~
 3. Install deeploc
       * Download deeploc from http://www.cbs.dtu.dk/cgi-bin/nph-sw_request?deeploc

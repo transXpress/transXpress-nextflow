@@ -311,8 +311,8 @@ script:
 process trinityInchwormChrysalis {
   cache 'lenient'
 
-  cpus 12
-  memory "200 GB"
+  cpus params.assembly_CPUs
+  memory params.assembly_MEM+" GB"
 
   tag { dateMetadataPrefix+"Trinity" }
 
@@ -423,8 +423,8 @@ process trinityFinish {
 
 
 process runSPAdes {
-cpus 16
-memory "200 GB"
+cpus params.assembly_CPUs
+memory params.assembly_MEM+" GB"
 
 input:
    file filteredPairedReads from filteredPairedReads_toRnaspades.collect()
@@ -485,7 +485,7 @@ process transdecoderLongOrfs {
 
 process kallisto {
   publishDir "transXpress_results", mode: "copy"
-  cpus 10
+  cpus params.assembly_CPUs
   input:
     file filteredReadsFromPairs from filteredPairedReads_toKallisto.collect() //This flattens the tuples
     set val(assemblerKallisto), file(transcriptomeKallisto), file(geneTransMap) from transcriptomeGeneTransMapKallisto
