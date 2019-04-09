@@ -19,7 +19,17 @@ fi
 ##Note: this doesn't work currently due to this issue: https://github.com/conda/conda/issues/2965
 #if [ -d "/lab/solexa_weng/testtube/miniconda3/bin" ]; then
 #source /lab/solexa_weng/testtube/miniconda3/bin/activate
+#else 
+#echo "Weng lab environment not found. Maybe you are running transXpress on non"
+#echo "weng lab hardware".
+#echo "If so, Please make sure you've installed all"
+#echo "the dependencies & sourced the right conda environment!"
 #fi
+
+echo "Please make sure you've installed all the dependencies"
+echo "and source the right conda environment!"
+echo "Future versions of transXpress will be more intelligent about dependency handling"
+##TODO handle dependencies more intelligently 
 
 ASSEMBLER=$1
 

@@ -198,7 +198,7 @@ output:
   //file "*U.qtrim.fastq.gz" into filteredSingleReads
 script:
 """
-##Adjust the params.TRIMMOMATIC_PARAMS in the nextflow.config file to change the parameters  
+##TODO:Adjust the params.TRIMMOMATIC_PARAMS in the nextflow.config file to change the parameters  
 trimmomatic PE -threads ${task.cpus} ${R1_reads} ${R2_reads} ${R1_reads}.R1-P.qtrim.fastq.gz ${R1_reads}.R1-U.qtrim.fastq.gz ${R2_reads}.R2-P.qtrim.fastq.gz ${R2_reads}.R2-U.qtrim.fastq.gz ${params.TRIMMOMATIC_PARAMS} 
 """
 }
@@ -231,6 +231,7 @@ script:
 fastqc ${R1_reads} &
 fastqc ${R2_reads}
 
+##TODO: fix this, so the pipeline doesn't execute if bad data is detected.
 ##Check for bad run
 #cat *.html | grep -oe "\\[FAIL\\].{1,30}Per sequence quality scores" > fastqc.fail
 ##If no bad run, produce the .fastqc.ok files
@@ -252,7 +253,7 @@ sleep 15 ##Not a super important process, so might as well put in a delay to hel
 """
 }
 
-
+//This is the samples file for rnaspades
 process relativeSamplesToYAML {
 executor 'local'
 input:
@@ -331,10 +332,11 @@ process trinityInchwormChrysalis {
     """
     Trinity --no_distributed_trinity_exec --max_memory ${task.memory.toGiga()}G --CPU ${task.cpus} --samples_file ${samples_file} ${params.TRINITY_PARAMS}
     sleep 5 ##Try to prevent filesystem latency errors
-    #chmod -R a-w ./trinity_out_dir
+    #chmod -R a-w ./trinity_out_dir ##<- make the results read only, to troubleshoot Trinity processes writing into directories they shouldn't.
     """
 }
 
+//This 
 trinityPhase1ReadPartitionsFiles_ch.flatten().map{ file ->
                                         def filePath = file.toAbsolutePath().toString()
                                         dir1Match = filePath =~ /Fb_[0-9]+/ ///Regex matching
@@ -655,6 +657,7 @@ predictProteome.into{ proteomeToAnnotation ; proteomeToPfamRevise }
 predictProteomeSplitBy100
   .splitFasta(by: 100, file: true)
   .into{ tmhmmChunks ; deeplocChunks ; signalpChunks }
+
 signalpChunks.into{ signalp4Chunks ; signalp5Chunks}
 
 proteomeToPfamRevise.combine(revisePfamChunks).set{ combinedToPfamRevise }
@@ -711,10 +714,10 @@ process signalp4Parallel {
   tag { chunk }
   script:
     """
-    if [ -f "" ]; then
+    if [ -f "/usr/local/bin/signalp" ]; then
      signalp -t ${params.SIGNALP_ORGANISMS} -f short ${chunk} > signalp_out
     else
-    echo "Unable to find signalP 4, so making dummy file"
+    echo "Unable to find signalP 4, so making dummy file instead"
      touch signalp_out
     fi
     """
@@ -735,7 +738,7 @@ process signalp5Parallel {
     if [ -f "/lab/solexa_weng/testtube/signalp-5.0/bin/signalp" ]; then
     /lab/solexa_weng/testtube/signalp-5.0/bin/signalp -prefix "signalp5_"${chunk} -org ${params.SIGNALP_ORGANISMS} -format short -fasta ${chunk} -gff3
     else
-    echo "Unable to find signalP 5, so making dummy files"
+    echo "Unable to find signalP 5, so making dummy files instead"
     touch blank.gff3
     touch blank.signalp5
     fi
@@ -753,14 +756,19 @@ process deeplocParallel {
   tag { chunk }
   script:
     """
-    ##export MKL_THREADING_LAYER=GNU
-    ##export PATH="/lab/solexa_weng/testtube/miniconda3/bin:$PATH"
-    ##deeploc -f ${chunk} -o ${chunk}.out
-    echo "deeploc disabled"
+    if hash deeploc 2>/dev/null;
+    then
+    export MKL_THREADING_LAYER=GNU
+    eexport PATH="/lab/solexa_weng/testtube/miniconda3/bin:$PATH"
+    deeploc -f ${chunk} -o ${chunk}.out
+    else
+    echo "Unable to find deeploc, so making dummy files instead"
     touch ${chunk}.out.txt
+    fi 
     """
 }
 
+//TODO: Update this to tmhmm.py, which is on conda?
 process tmhmmParallel {
   cpus 1
   input:
