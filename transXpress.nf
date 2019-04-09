@@ -778,8 +778,14 @@ process tmhmmParallel {
   tag { chunk }
   script:
     """
+    if hash deeploc 2>/dev/null;
+    then
     echo tmhmm ${chunk}
     tmhmm --short < ${chunk} > tmhmm_out
+    else
+    echo "Unable to find tmhmm, so making dummy files instead"
+    touch tmhmm_out
+    fi
     """
 }
 tmhmmResults.collectFile(name: 'tmhmm_annotations.tsv').into{ tmhmmResultToAnnotate ; tmhmmResultToGff3 }
