@@ -336,7 +336,15 @@ process trinityInchwormChrysalis {
     """
 }
 
-//This 
+//This is a workaround, of sorts, to parallelize the Trinity butterfly steps
+//As Trinity usually expects to be writing into a single directory over time
+//which doesn't play nice with Nextflow, have to do some tricks
+//to recreate the structure of the Trinity work directory
+//so each process ends up with a symbolic linked copy of the Trinity work directory
+//and can write real files in the proper directory structure.
+//But that directory structure can't be remade by Nextflow using Queue Channels, that I am aware of
+//So the below mapping trick makes the directory structure into variables
+//that the "trinityFinish" process can use to recreate the structure
 trinityPhase1ReadPartitionsFiles_ch.flatten().map{ file ->
                                         def filePath = file.toAbsolutePath().toString()
                                         dir1Match = filePath =~ /Fb_[0-9]+/ ///Regex matching
@@ -681,6 +689,10 @@ then
       echo "no changes between the longorfs and transdecoder predict versions"
       touch test.txt
 else
+      ##TODO, maybe delete this whole process. I was under the impression that 
+      ##the transdecoder peptides would change after transdecoder predict
+      ##But seems this isn't true?
+      ##Or at least I haven't seen this get triggered w/ the test datasets
       echo "changes detected"
 fi
 
@@ -696,11 +708,14 @@ file pfamDomResult from pfamToGff3Doms
 file refGFF3 from transdecoderGFF3ToPfam
 
 output:
-file "pfam_domains.gff3"
+ file "pfam_domains.gff3" //TODO hook this up to 
 tag { "$refGFF3" }
 script:
 """
-python ../../../pfam2gff.py -g ${refGFF3} -i ${pfamDomResult} -T > pfam_domains.gff3
+##Using wrf's pfam2gff script.
+##Disabled for now until the dependency situation is figured out.
+##python ../../../pfam2gff.py -g ${refGFF3} -i ${pfamDomResult} -T > pfam_domains.gff3
+touch pfam_domains.gff3
 """
 }
 
