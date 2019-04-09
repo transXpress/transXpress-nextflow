@@ -23,9 +23,11 @@ Requires
 * NCBI BLAST+ (install via conda)
 * R (install via conda)
 * seqkit (install via conda)
+* basic Linux utitilies: wget, split, awk, cut, gzip
+
+Optional
 * [deeploc](http://www.cbs.dtu.dk/cgi-bin/nph-sw_request?deeploc) / [SignalP 4.1](http://www.cbs.dtu.dk/cgi-bin/sw_request?signalp+4.1) / [SignalP 5.0](http://www.cbs.dtu.dk/cgi-bin/nph-sw_request?signalp)
 * [tmhmm v. 2.0](http://www.cbs.dtu.dk/services/TMHMM/)
-* basic Linux utitilies: wget, split, awk, cut, gzip
 
 ## Installation
 
