@@ -23,31 +23,38 @@ Requires
 * NCBI BLAST+ (install via conda)
 * R (install via conda)
 * seqkit (install via conda)
+* basic Linux utitilies: wget, split, awk, cut, gzip
+
+Optional
 * [deeploc](http://www.cbs.dtu.dk/cgi-bin/nph-sw_request?deeploc) / [SignalP 4.1](http://www.cbs.dtu.dk/cgi-bin/sw_request?signalp+4.1) / [SignalP 5.0](http://www.cbs.dtu.dk/cgi-bin/nph-sw_request?signalp)
 * [tmhmm v. 2.0](http://www.cbs.dtu.dk/services/TMHMM/)
-* basic Linux utitilies: wget, split, awk, cut, gzip
 
 ## Installation
 
 1. Install [Miniconda3](https://conda.io/en/latest/miniconda.html)
-2. Install other dependencies:  
+2. Install conda dependencies:  
 ~~~
  conda config --add channels bioconda
  conda config --add channels conda-forge
  conda config --add channels r
  conda install nextflow fastqc trimmomatic trinity=2.8.4-0 spades transdecoder biopython samtools bowtie2 infernal hmmer kallisto blast r seqkit bioconductor-edger
 ~~~
+(Note, below dependencies are optional, transXpress will run to completion without them, but will produce empty files for their output)
+
 3. Install deeploc (performance being evaluated by transXpress developers in comparison to SingalP 4.1/5.0)
       * Download deeploc from http://www.cbs.dtu.dk/cgi-bin/nph-sw_request?deeploc
       * Install dependencies: `pip install -r requirements.txt`
       * Install deeploc: `python setup.py install` or locally: `python setup.py install --user`
       
 4. Install SignalP 4.1g (performance being evaluated by transXpress developers in comparison to SingalP 5.0/deeploc)
-      * Download deeploc from http://www.cbs.dtu.dk/cgi-bin/sw_request?signalp+4.1
+      * Download SignalP 4.1g from http://www.cbs.dtu.dk/cgi-bin/sw_request?signalp+4.1
 
 
 5. Install SignalP 5.0 (performance being evaluated by transXpress developers in comparison to SingalP 4.1/deeploc)
-      * Download deeploc from http://www.cbs.dtu.dk/cgi-bin/nph-sw_request?signalp
+      * Download SignalP 5.0 from http://www.cbs.dtu.dk/cgi-bin/nph-sw_request?signalp
+      
+6. Install tmhmm
+      * Download tmhmm from http://www.cbs.dtu.dk/services/TMHMM/
 
 
 ## Usage
@@ -64,7 +71,7 @@ Symbolically link the transxpress-nextflow code into your assembly directory
 ```
 ln -s /your/transxpress-nextflow-cloned-directory/* ./
 ```
-Execute the run.sh script with your assembler of choice, either `trinity` or `rnaspades` currently
+Make sure your conda environment has been sourced, and then execute the run.sh script with your assembler of choice, either `trinity` or `rnaspades` currently
 ```
 ./run.sh trinity
 ```
