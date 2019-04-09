@@ -69,7 +69,7 @@ Symbolically link the transxpress-nextflow code into your assembly directory
 ```
 ln -s /your/transxpress-nextflow-cloned-directory/* ./
 ```
-Make sure your conda environment has been sourced, and execute the run.sh script with your assembler of choice, either `trinity` or `rnaspades` currently
+Make sure your conda environment has been sourced, and then execute the run.sh script with your assembler of choice, either `trinity` or `rnaspades` currently
 ```
 ./run.sh trinity
 ```
