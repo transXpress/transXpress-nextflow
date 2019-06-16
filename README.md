@@ -32,7 +32,11 @@ Optional
 ## Installation
 
 1. Install [Miniconda3](https://conda.io/en/latest/miniconda.html)
-2. Install conda dependencies:  
+2. Setup conda environment 
+~~~
+conda create --name transxpress
+~~~
+3. Install conda dependencies:  
 ~~~
  conda config --add channels bioconda
  conda config --add channels conda-forge
@@ -41,19 +45,19 @@ Optional
 ~~~
 (Note, below dependencies are optional, transXpress will run to completion without them, but will produce empty files for their output)
 
-3. Install deeploc (performance being evaluated by transXpress developers in comparison to SingalP 4.1/5.0)
+4. Install deeploc (performance being evaluated by transXpress developers in comparison to SingalP 4.1/5.0)
       * Download deeploc from http://www.cbs.dtu.dk/cgi-bin/nph-sw_request?deeploc
       * Install dependencies: `pip install -r requirements.txt`
       * Install deeploc: `python setup.py install` or locally: `python setup.py install --user`
       
-4. Install SignalP 4.1g (performance being evaluated by transXpress developers in comparison to SingalP 5.0/deeploc)
+5. Install SignalP 4.1g (performance being evaluated by transXpress developers in comparison to SingalP 5.0/deeploc)
       * Download SignalP 4.1g from http://www.cbs.dtu.dk/cgi-bin/sw_request?signalp+4.1
 
 
-5. Install SignalP 5.0 (performance being evaluated by transXpress developers in comparison to SingalP 4.1/deeploc)
+6. Install SignalP 5.0 (performance being evaluated by transXpress developers in comparison to SingalP 4.1/deeploc)
       * Download SignalP 5.0 from http://www.cbs.dtu.dk/cgi-bin/nph-sw_request?signalp
       
-6. Install tmhmm
+7. Install tmhmm
       * Download tmhmm from http://www.cbs.dtu.dk/services/TMHMM/
 
 
