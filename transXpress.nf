@@ -147,7 +147,7 @@ script:
 """
 }
 //Load samples into filepair tuples.
-toParse.splitCsv(sep:' ',header:false)
+toParse.splitCsv(sep:'[ \t]+',header:false)
      .map{ row ->
      println row
      return tuple(file(row[2]), file(row[3])) }
