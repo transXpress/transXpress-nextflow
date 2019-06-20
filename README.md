@@ -35,6 +35,7 @@ Optional
 2. Setup conda environment 
 ~~~
 conda create --name transxpress
+conda activate transxpress
 ~~~
 3. Install conda dependencies:  
 ~~~
@@ -59,7 +60,6 @@ conda create --name transxpress
       
 7. Install tmhmm
       * Download tmhmm from http://www.cbs.dtu.dk/services/TMHMM/
-
 
 ## Usage
 Make your assembly directory and change it to the current directory
