@@ -4,7 +4,7 @@
 if [ -d "/lab/solexa_weng/testtube/miniconda3/bin" ]; then
 echo "Setting up Weng lab miniconda environment..."
 source /lab/solexa_weng/testtube/miniconda3/bin/activate
-conda activate transxpress-nextflow
+conda activate transxpress
 else 
 echo "Weng lab conda environment not found. Maybe you are running transXpress on non"
 echo "Weng lab hardware."
