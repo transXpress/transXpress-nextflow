@@ -2,8 +2,8 @@
 
 /*
  * Notes: 
- * - must avoid spaces in filenames in samples.txt
- * - samples.txt must contain complete (absolute) paths to read files
+ * - must avoid spaces in filenames in samples.tsv
+ * - samples.tsv must contain complete (absolute) paths to read files
  */
 
 //This ensures that if the workflow is rerun on a different day from the same input files, then 
@@ -138,9 +138,9 @@ process downloadPfam {
 process loadSamples {
 executor 'local'
 input:
-  file "samples.txt" from file(params.samples)
+  file "samples.tsv" from file(params.samples)
 output:
-  file "samples.txt" into toParse, toRelative
+  file "samples.tsv" into toParse, toRelative
 script:
 """
 ##do nothing. This process is just so the dag looks nicer
@@ -161,7 +161,7 @@ executor 'local'
 input:
     file toRelative
 output:
-    file "relative_samples.txt" into relativeSamples_ch
+    file "relative_samples.tsv" into relativeSamples_ch
 script:
 """
 #!/usr/bin/env python
@@ -169,7 +169,7 @@ import re
 import os
 import os.path
 
-output_handle = open("relative_samples.txt", "w")
+output_handle = open("relative_samples.tsv", "w")
 
 with open("${toRelative}", "r") as input_handle:
       for line in input_handle:
@@ -241,7 +241,7 @@ fastqc ${R2_reads}
 # touch ${R1_reads}.fastqc.ok
 # touch ${R2_reads}.fastqc.ok
 #else
-# echo "Error. FastQC detected a failure in the per read sequencing quality. This possibly indicates a bad sequencing run, which would result in a poor transcriptome assembly. Please solve the quality issue in your raw read files provided in samples.txt"
+# echo "Error. FastQC detected a failure in the per read sequencing quality. This possibly indicates a bad sequencing run, which would result in a poor transcriptome assembly. Please solve the quality issue in your raw read files provided in samples.tsv"
 # exit 1
 #fi
 
