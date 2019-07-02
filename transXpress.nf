@@ -444,7 +444,7 @@ output:
    set val("rnaSPAdes"), file("rnaSPAdes.gene_trans_map"),file(dateMetadataPrefix+"rnaSPAdes/transcripts.fasta") into rnaSPAdesFinalOutput
 script:
 """
-rnaspades.py --dataset ${datasets_YAML} -t ${task.cpus} -m ${task.memory.toGiga()} -o ${dateMetadataPrefix}rnaSPAdes --only-assembler -k 47
+rnaspades.py --dataset ${datasets_YAML} ${params.STRAND_SPECIFIC_RNASPADES} -t ${task.cpus} -m ${task.memory.toGiga()} -o ${dateMetadataPrefix}rnaSPAdes --only-assembler -k 47
 ##Make a fake gene to transcript file:
 cat "${dateMetadataPrefix}rnaSPAdes/transcripts.fasta" | grep ">" | tr -d ">" | cut -f 1 -d " " > tmp.txt
 paste tmp.txt tmp.txt > rnaSPAdes.gene_trans_map
@@ -510,7 +510,7 @@ process kallisto {
     """
     export TRINITY_HOME=\$(dirname \$(readlink -f \$(which Trinity)))
     echo TRINITY_HOME set to \${TRINITY_HOME}
-    \${TRINITY_HOME}/util/align_and_estimate_abundance.pl --transcripts ${transcriptomeKallisto} ${params.STRAND_SPECIFIC} --seqType fq --samples_file ${relativeSamples} --prep_reference --thread_count ${task.cpus} --est_method kallisto --gene_trans_map ${geneTransMap}
+    \${TRINITY_HOME}/util/align_and_estimate_abundance.pl --transcripts ${transcriptomeKallisto} ${params.STRAND_SPECIFIC_TRINITY} --seqType fq --samples_file ${relativeSamples} --prep_reference --thread_count ${task.cpus} --est_method kallisto --gene_trans_map ${geneTransMap}
     \${TRINITY_HOME}/util/abundance_estimates_to_matrix.pl --est_method kallisto --name_sample_by_basedir --gene_trans_map $geneTransMap */abundance.tsv
     """
 }
