@@ -12,6 +12,6 @@ echo "If so, Please make sure you've installed all"
 echo "the dependencies & sourced the right conda environment!"
 fi
 
-../../run.sh "trinity" "test_notStrandSpecific_local"
+../../run.sh "trinity" "test_notStrandSpecific_LSF"
 
 
