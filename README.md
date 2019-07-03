@@ -81,6 +81,20 @@ Make sure your conda environment has been sourced, and then execute the run.sh s
 ```
 NextFlow only likes 1 assembly per directory, so if you'd like to run two assemblies simultaneously, you have to use different assembly directories.
 
+```
+./run.sh trinity strandSpecific_local
+```
+
+The 2nd parameter for the ./run.sh wrapper script allows you to specify the profile that is used. The profiles (stored in the `nextflow.config` file) are currently used to configure the execution mode (cluster vs local), and if the assembly is strand specific or not.
+```
+notStrandSpecific_local
+strandSpecific_local
+notStrandSpecific_LSF
+strandSpecific_LSF
+test_notStrandSpecific_local
+test_strandSpecific_local
+```
+
 ## Flow graph
 ![Directed acyclic graph for transXpress-nextflow program execution](./tests/test_nonSS-trinity/test_nonSS_dag.svg)
 
