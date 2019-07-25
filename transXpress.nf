@@ -188,7 +188,7 @@ relativeSamples_ch.into{ samples_file_toTrinity; relativeSamples_toTrinityFinish
 
 
 process trimmomatic {
-cpus 4
+cpus params.general_CPUs
 input:
  set file(R1_reads),file(R2_reads) from trimReadPairs_ch
  file "adapters.fasta" from file(params.trimmomatic_adapter_file)
@@ -219,7 +219,7 @@ filteredPairedReads_toTrinity.collect().into{ trinityInchwormPairedReads ; trini
 
 process fastqc {
 publishDir "transXpress_results/fastqc_results/", mode: "copy"
-cpus 2
+cpus params.general_CPUs
 input:
  set file(R1_reads),file(R2_reads) from fastqcReadPairs_ch
 tag {"$R1_reads"+" and " +"$R2_reads"}
@@ -361,7 +361,7 @@ trinityPhase1ReadPartitionsFiles_ch.flatten().map{ file ->
 process trinityButterflyParallelVersion2 {
   //TODO This process has hardcoded parameters.  It should really be getting them from the TRINITY params...
   cache 'lenient'
-  cpus 10
+  cpus params.assembly_CPUs
   input:
     file "trinity_out_dir/*" from trinityWorkDirRootFiles_ch1 //An attempt to relativize the butterfly processes
     file "trinity_out_dir/chrysalis/*" from trinityWorkDirChrysalisFiles_ch1 //An attempt to relativize the butterfly processes
