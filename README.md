@@ -42,7 +42,7 @@ conda activate transxpress
  conda config --add channels bioconda
  conda config --add channels conda-forge
  conda config --set channel_priority false
- conda install nextflow fastqc trimmomatic trinity spades transdecoder biopython samtools bowtie2 infernal hmmer kallisto blast r seqkit bioconductor-edger parallel
+ conda install nextflow fastqc trimmomatic trinity spades transdecoder biopython samtools bowtie2 infernal hmmer kallisto blast r seqkit bioconductor-edger parallel graphviz
 ~~~
 (Note, below dependencies are optional, transXpress will run to completion without them, but will produce empty files for their output)
 
