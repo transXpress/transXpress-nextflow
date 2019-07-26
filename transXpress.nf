@@ -594,7 +594,7 @@ process pfamParallel {
   output:
     file "pfam_out" into pfamResults
     file "pfam_dom_out" into pfamDomResults
-    set file("${chunk}"),file("${"pfam_dom_out"}") into revisePfamChunks
+    set file("${chunk}"),file("${"pfam_dom_out"}") into revisePfamChunks //Pass through of the "longorf" peptide files
   tag { dateMetadataPrefix+chunk }
   script:
     """
@@ -678,11 +678,12 @@ tag { dateMetadataPrefix+"${longOrfChunk}" }
 script:
 """
 seqkit fx2tab -n -i ${longOrfChunk} | cut -f 1 > ids.txt
-seqkit grep -f ids.txt ${proteome} > predict_subset.fasta
-seqkit grep -s -f <(seqkit seq -s ${longOrfChunk}) predict_subset.fasta > common.fasta
+seqkit grep -f ids.txt ${proteome} > post-predict_subset.fasta
+seqkit grep -s -f <(seqkit seq -s ${longOrfChunk}) post-predict_subset.fasta > common.fasta ##Find all the fasta records where the sequences match exactly.
 
-predictLen=`cat predict_subset.fasta | grep ">" | wc -l`
+predictLen=`cat post-predict_subset.fasta | grep ">" | wc -l`
 commonLen=`cat common.fasta | grep ">" | wc -l`
+echo "$predictLen proteins were analyzed & $commonLen had an exact sequence match"
 if [ \$predictLen -eq \$commonLen ]
 then
       echo "no changes between the longorfs and transdecoder predict versions"
