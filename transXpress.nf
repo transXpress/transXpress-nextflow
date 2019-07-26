@@ -3,7 +3,6 @@
 /*
  * Notes: 
  * - must avoid spaces in filenames in samples.tsv
- * - samples.tsv must contain complete (absolute) paths to read files
  */
 
 //This ensures that if the workflow is rerun on a different day from the same input files, then 
