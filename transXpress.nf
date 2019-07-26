@@ -683,7 +683,7 @@ seqkit grep -s -f <(seqkit seq -s ${longOrfChunk}) post-predict_subset.fasta > c
 
 predictLen=`cat post-predict_subset.fasta | grep ">" | wc -l`
 commonLen=`cat common.fasta | grep ">" | wc -l`
-echo "$predictLen proteins were analyzed & $commonLen had an exact sequence match"
+echo "\$predictLen proteins were analyzed & \$commonLen had an exact sequence match"
 if [ \$predictLen -eq \$commonLen ]
 then
       echo "no changes between the longorfs and transdecoder predict versions"
