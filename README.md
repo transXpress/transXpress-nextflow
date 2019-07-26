@@ -96,6 +96,12 @@ strandSpecific_LSF
 test_notStrandSpecific_local
 test_strandSpecific_local
 ```
+## Running tests
+```
+cd ./tests/
+cd ./test_nonSS-trinity ##non strand specific assembly using trinity. Other directories have other assemblers / parameters.
+./run_test.sh
+```
 
 ## Flow graph
 ![Directed acyclic graph for transXpress-nextflow program execution](./tests/test_nonSS-trinity/test_nonSS_dag.svg)
