@@ -197,7 +197,6 @@ output:
   //file "*U.qtrim.fastq.gz" into filteredSingleReads
 script:
 """
-##TODO:Adjust the params.TRIMMOMATIC_PARAMS in the nextflow.config file to change the parameters  
 trimmomatic PE -threads ${task.cpus} ${R1_reads} ${R2_reads} ${R1_reads}.R1-P.qtrim.fastq.gz ${R1_reads}.R1-U.qtrim.fastq.gz ${R2_reads}.R2-P.qtrim.fastq.gz ${R2_reads}.R2-U.qtrim.fastq.gz ${params.TRIMMOMATIC_PARAMS} 
 """
 }
