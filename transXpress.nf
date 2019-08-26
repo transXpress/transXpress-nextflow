@@ -793,7 +793,7 @@ process tmhmmParallel {
   tag { chunk }
   script:
     """
-    if hash deeploc 2>/dev/null;
+    if hash tmmhmm 2>/dev/null;
     then
     echo tmhmm ${chunk}
     tmhmm --short < ${chunk} > tmhmm_out
