@@ -41,7 +41,7 @@ if (!outFile.exists()) {
 
 
     outFile.withWriter('UTF-8') {
-        writer - >
+        writer ->
             writer.write(dateMetadataPrefix)
     }
 }
