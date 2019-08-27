@@ -2,7 +2,6 @@
 
 /*
  * Notes: 
- * - must avoid spaces in filenames in samples.tsv
  */
 
 //This ensures that if the workflow is rerun on a different day from the same input files, then 
@@ -250,7 +249,7 @@ sleep 15 ##Not a super important process, so might as well put in a delay to hel
 """
 }
 
-//This is the samples file for rnaspades
+//This produces the samples file for rnaspades
 process relativeSamplesToYAML {
 executor 'local'
 input:
@@ -307,8 +306,9 @@ script:
 }
 
 process trinityInchwormChrysalis {
+  //See here for an alternative approach:
+  //https://github.com/biocorecrg/transcriptome_assembly/blob/564f6af2e4db9625ae9de6884a6524b4ec57cece/denovo_assembly/denovo_assembly.nf#L157
   cache 'lenient'
-
   cpus params.assembly_CPUs
   memory params.assembly_MEM+" GB"
 
@@ -357,11 +357,13 @@ trinityPhase1ReadPartitionsFiles_ch.flatten().map{ file ->
 
 process trinityButterflyParallelVersion2 {
   //TODO This process has hardcoded parameters.  It should really be getting them from the TRINITY params...
+  //See here for an alternative approach to this node:
+  //https://github.com/biocorecrg/transcriptome_assembly/blob/564f6af2e4db9625ae9de6884a6524b4ec57cece/denovo_assembly/denovo_assembly.nf#L183
   cache 'lenient'
   cpus params.assembly_CPUs
   input:
-    file "trinity_out_dir/*" from trinityWorkDirRootFiles_ch1 //An attempt to relativize the butterfly processes
-    file "trinity_out_dir/chrysalis/*" from trinityWorkDirChrysalisFiles_ch1 //An attempt to relativize the butterfly processes
+    file "trinity_out_dir/*" from trinityWorkDirRootFiles_ch1
+    file "trinity_out_dir/chrysalis/*" from trinityWorkDirChrysalisFiles_ch1
     set dir,file(fastaFiles) from partitionedReadGroups_ch
     
   output:
@@ -441,6 +443,7 @@ output:
    set val("rnaSPAdes"), file("rnaSPAdes.gene_trans_map"),file(dateMetadataPrefix+"rnaSPAdes/transcripts.fasta") into rnaSPAdesFinalOutput
 script:
 """
+##TODO Fixed kmer? Should open it up as a parameter instead?
 rnaspades.py --dataset ${datasets_YAML} ${params.STRAND_SPECIFIC_RNASPADES} -t ${task.cpus} -m ${task.memory.toGiga()} -o ${dateMetadataPrefix}rnaSPAdes --only-assembler -k 47
 ##Make a fake gene to transcript file:
 cat "${dateMetadataPrefix}rnaSPAdes/transcripts.fasta" | grep ">" | tr -d ">" | cut -f 1 -d " " > tmp.txt
@@ -791,7 +794,11 @@ process tmhmmParallel {
   tag { chunk }
   script:
     """
-    if hash tmmhmm 2>/dev/null;
+    ##If interested in using tmhmm.py:
+    ##tmhmm -m \${CONDA_PREFIX}/TMHMM2.0.model -f ${chunk}
+    ##It makes 3 files, *.annotation, *.plot, *.summary
+
+    if hash tmhmm 2>/dev/null;
     then
     echo tmhmm ${chunk}
     tmhmm --short < ${chunk} > tmhmm_out
