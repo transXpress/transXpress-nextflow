@@ -307,8 +307,9 @@ script:
 }
 
 process trinityInchwormChrysalis {
+  //See here for an alternative approach:
+  //https://github.com/biocorecrg/transcriptome_assembly/blob/564f6af2e4db9625ae9de6884a6524b4ec57cece/denovo_assembly/denovo_assembly.nf#L157
   cache 'lenient'
-
   cpus params.assembly_CPUs
   memory params.assembly_MEM+" GB"
 
@@ -357,11 +358,13 @@ trinityPhase1ReadPartitionsFiles_ch.flatten().map{ file ->
 
 process trinityButterflyParallelVersion2 {
   //TODO This process has hardcoded parameters.  It should really be getting them from the TRINITY params...
+  //See here for an alternative approach to this node:
+  //https://github.com/biocorecrg/transcriptome_assembly/blob/564f6af2e4db9625ae9de6884a6524b4ec57cece/denovo_assembly/denovo_assembly.nf#L183
   cache 'lenient'
   cpus params.assembly_CPUs
   input:
-    file "trinity_out_dir/*" from trinityWorkDirRootFiles_ch1 //An attempt to relativize the butterfly processes
-    file "trinity_out_dir/chrysalis/*" from trinityWorkDirChrysalisFiles_ch1 //An attempt to relativize the butterfly processes
+    file "trinity_out_dir/*" from trinityWorkDirRootFiles_ch1
+    file "trinity_out_dir/chrysalis/*" from trinityWorkDirChrysalisFiles_ch1
     set dir,file(fastaFiles) from partitionedReadGroups_ch
     
   output:
