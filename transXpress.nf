@@ -8,44 +8,43 @@
 //This ensures that if the workflow is rerun on a different day from the same input files, then 
 //it doesn't recalculate the assembly_prefix
 def outFile = new File('transXpress_results/assembly_prefix.txt')
-if ( ! outFile.exists() )
-{
+if (!outFile.exists()) {
 
-def resultsDir = new File('transXpress_results') 
-if ( ! resultsDir.exists())
-{
-resultsDir.mkdirs() //Make the transXpress_results directory
-}
+    def resultsDir = new File('transXpress_results')
+    if (!resultsDir.exists()) {
+        resultsDir.mkdirs() //Make the transXpress_results directory
+    }
 
 
-theDate = ""
-if ( params.prefix_add_date == true) {
-theDate = new java.util.Date().format( params.prefix_add_date_formatting ) //yyMMdd by default
-}
+    theDate = ""
+    if (params.prefix_add_date == true) {
+        theDate = new java.util.Date().format(params.prefix_add_date_formatting) //yyMMdd by default
+    }
 
-metadata = ""
-if ( params.prefix_add_metadata_file != "" ) {
-theText = file(params.prefix_add_metadata_file).text
-metadata = theText.replace(" ","_").trim()
-}
+    metadata = ""
+    if (params.prefix_add_metadata_file != "") {
+        theText = file(params.prefix_add_metadata_file).text
+        metadata = theText.replace(" ", "_").trim()
+    }
 
-dateMetadataToJoin = []
-if (theDate != "") {
-dateMetadataToJoin.add(theDate)
-}
-if (metadata != "") {
-dateMetadataToJoin.add(metadata)
-}
+    dateMetadataToJoin = []
+    if (theDate != "") {
+        dateMetadataToJoin.add(theDate)
+    }
+    if (metadata != "") {
+        dateMetadataToJoin.add(metadata)
+    }
 
-dateMetadataPrefix = dateMetadataToJoin.join("_")
-if (dateMetadataPrefix != "") {
-  dateMetadataPrefix += "_"
-}
+    dateMetadataPrefix = dateMetadataToJoin.join("_")
+    if (dateMetadataPrefix != "") {
+        dateMetadataPrefix += "_"
+    }
 
 
-outFile.withWriter('UTF-8') { writer ->
-    writer.write(dateMetadataPrefix)
-}
+    outFile.withWriter('UTF-8') {
+        writer - >
+            writer.write(dateMetadataPrefix)
+    }
 }
 
 //Convert into a global string variable
