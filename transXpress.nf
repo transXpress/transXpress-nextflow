@@ -251,7 +251,7 @@ sleep 15 ##Not a super important process, so might as well put in a delay to hel
 """
 }
 
-//This is the samples file for rnaspades
+//This produces the samples file for rnaspades
 process relativeSamplesToYAML {
 executor 'local'
 input:
@@ -442,6 +442,7 @@ output:
    set val("rnaSPAdes"), file("rnaSPAdes.gene_trans_map"),file(dateMetadataPrefix+"rnaSPAdes/transcripts.fasta") into rnaSPAdesFinalOutput
 script:
 """
+##TODO Fixed kmer? Should open it up as a parameter instead?
 rnaspades.py --dataset ${datasets_YAML} ${params.STRAND_SPECIFIC_RNASPADES} -t ${task.cpus} -m ${task.memory.toGiga()} -o ${dateMetadataPrefix}rnaSPAdes --only-assembler -k 47
 ##Make a fake gene to transcript file:
 cat "${dateMetadataPrefix}rnaSPAdes/transcripts.fasta" | grep ">" | tr -d ">" | cut -f 1 -d " " > tmp.txt
@@ -792,7 +793,11 @@ process tmhmmParallel {
   tag { chunk }
   script:
     """
-    if hash tmmhmm 2>/dev/null;
+    ##If interested in using tmhmm.py:
+    ##tmhmm -m \${CONDA_PREFIX}/TMHMM2.0.model -f ${chunk}
+    ##It makes 3 files, *.annotation, *.plot, *.summary
+
+    if hash tmhmm 2>/dev/null;
     then
     echo tmhmm ${chunk}
     tmhmm --short < ${chunk} > tmhmm_out
