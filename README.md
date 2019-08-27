@@ -69,7 +69,7 @@ cd your_assembly_directory
 ```
 Setup the mandatory 'samples.tsv' file in the assembly directory describing where to find your raw read FASTQ files. Reads will be pooled from all samples for a single transcriptome assembly, but expression quantification will happen on a per-sample basis. See the tests directory for an example of a samples file: [samples.tsv](./tests/test_nonSS-trinity/samples.tsv)
 
-Setup the mandatory 'species.txt' file in the directory describing which species the data comes from. See the tests directory for an example of a species file: [species.txt](./tests/test_nonSS-trinity/species.txt)
+Setup the mandatory 'prefix.txt' file in the directory describing which genus species the data comes from, or whichever metadata you prefer to add. See the tests directory for an example of a species file: [prefix.txt](./tests/test_nonSS-trinity/prefix.txt)
 
 Symbolically link the transxpress-nextflow code into your assembly directory
 ```
