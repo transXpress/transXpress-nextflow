@@ -458,7 +458,7 @@ process renameAssembly {
    publishDir "transXpress_results", mode: "copy"
    input:
     set val(assembler), file(geneTransMap), file(transcriptome_fasta) from finishedAssemblies
-    file "species.txt" from file(params.prefix_add_metadata_file) //Just a dummy input to include the file on the DAG
+    file "prefix.txt" from file(params.prefix_add_metadata_file) //Just a dummy input to include the file on the DAG
    output:
     file "${dateMetadataPrefix}${assembler}.transcripts.fasta" into transcriptomeToSplit 
     set assembler, file("${dateMetadataPrefix}${assembler}.transcripts.fasta") into transcriptomeToTransdecoder, transcriptomeToStats, transcriptomeToAnnotation //Also pass the assembler type along
