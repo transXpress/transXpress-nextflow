@@ -4,7 +4,32 @@
  * Notes: 
  */
 
-//This ensures that if the workflow is rerun on a different day from the same input files, then 
+//A possible future option is to directly download reads from SRA
+if (params.sra_download != null)
+{
+Channel
+    .fromSRA(params.sra_download)
+    .set{readsTuple}
+
+}
+else
+{
+Channel.empty().set{readsTuple}
+}
+
+process download_sra_reads {
+    input:
+     set val(sample_id), val(readFiles) from readsTuple
+    output:
+     set file("${sample_id}_1.fq.gz"), file("${sample_id}_1.fq.gz"), file("${sample_id}_2.fq.gz") into pairedDownloadedReads
+    script:
+    """
+    wget -O ${sample_id}_1.fq.gz ftp://ftp.sra.ebi.ac.uk${readFiles[0]}
+    wget -O ${sample_id}_2.fq.gz ftp://ftp.sra.ebi.ac.uk${readFiles[1]}
+    """
+}
+
+//The below code ensures that if the workflow is rerun on a different day from the same input files, then 
 //it doesn't recalculate the assembly_prefix
 def outFile = new File('transXpress_results/assembly_prefix.txt')
 if (!outFile.exists()) {
