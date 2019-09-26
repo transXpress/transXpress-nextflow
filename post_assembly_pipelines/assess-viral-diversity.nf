@@ -1,3 +1,5 @@
+Channel.fromPath(params.query).set{queryFasta}
+
 process downloadUniprotViruses {
   executor 'local'
   storeDir "./db"
@@ -94,3 +96,32 @@ mmseqs createdb ${inputFasta} ${inputFasta}.mmseqsdb
 
 //Should do a map/join to linkup the Dbs and the fasta files.
 
+process splitQueryFasta {
+conda "ucsc-fasplit"
+input:
+ file(inputFasta) from queryFasta
+output:
+ file("split/*.fa") into splitQueryFastas
+script:
+"""
+mkdir split
+faSplit about ${inputFasta} 10000000 split/
+"""
+}
+
+splitQueryFastas.flatten().combine(dmnd_Dbs).set{dmnd_files}
+
+process doDiamondSearch {
+maxForks 4
+cpus 1
+input:
+ set file(query_file),file(dmnd_db_file) from dmnd_files
+output:
+ file("matches.sam")
+script:
+"""
+DMND_DB_NAME=${dmnd_db_file}
+DMND_DB_NAME=\${DMND_DB_NAME%.dmnd}
+diamond blastx -d \${DMND_DB_NAME} -q ${query_file} --outfmt 101 --threads ${task.cpus} -o ${query_file}-\${DMND_DB_NAME}.dmnd-matches.sam
+"""
+}
