@@ -64,69 +64,6 @@ wget -O - "ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledge
 """
 }
 
-////This process works, but is waaay too slow
-////not sure if there is a premade file that has
-////the annotation of which host organism the virus is from.
-////
-////
-//process parseUniprotTaxonMapping {
-//conda "ete3 biopython"
-//storeDir params.store_dir
-//input:
- //file ete3_taxonomy from ete3_taxonomy_database
- //file virusSwissFile from uniprot_total_viruses
-//output:
- //file "taxon_lookup.txt" into taxon_lookup_file
-/script:
-//"""
-//#!/usr/bin/env python
-//import gzip
-//import Bio
-//from Bio import SeqIO
-//from ete3 import Tree
-//from ete3 import NCBITaxa
-//import os
-
-//ncbi = NCBITaxa("${ete3_taxonomy}")
-//write_handle = open("taxon_lookup.txt","w")
-//read_handle = gzip.open("${virusSwissFile}")
-//for record in SeqIO.parse(read_handle, "swiss"):
-//    assert len(record.annotations['ncbi_taxid']) == 1
-//    
-//    taxid = record.annotations['ncbi_taxid']
-//    virus_obj = ncbi.get_taxid_translator(taxid)
-//    keys = list(virus_obj)
-//    if len(keys) > 0:
-//        theKey = keys[0]
-//        virus_name = virus_obj[theKey]
-//    else:
-//        virus_name = "virus name parse error"
-//        
-//    if 'host_ncbi_taxid' in record.annotations.keys():
-//        host_taxid = record.annotations['host_ncbi_taxid']
-//        ##print(record.id,taxid,host_taxid,record.name)
-//    else:
-//        ##Derive our own host species identifier, from the name of the virus
-//        #putative_genus = virus_name.split(" ")[0]
-//        #putative_species = virus_name.split(" ")[1]
-//        #genus_species =[putative_genus+" "+putative_species]
-//        #looked_up_taxon = ncbi.get_name_translator(genus_species)
-//        looked_up_taxon = False ######<<<< This disables the lookup, basically
-//        ##It is disabled, as it works for simple cases "Drosophila melanogaster", but not others
-//        if bool(looked_up_taxon) == False:
-//            ##No hit
-//            host_taxid = ['N/A']
-//        else:
-//            ##Found a hit
-//            theName = list(looked_up_taxon)[0]
-//            host_taxid = looked_up_taxon[theName]
-//    theString = "\t".join([record.id,taxid[0],str(host_taxid),record.name,virus_name])
-//    write_handle.write(theString+os.linesep)
-//write_handle.close()
-//read_handle.close()
-//"""
-//}
-
 process clone_BlobTools {
 conda "anaconda matplotlib docopt tqdm wget pyyaml git pysam"
 storeDir params.store_dir
