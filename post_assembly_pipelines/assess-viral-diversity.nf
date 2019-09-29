@@ -7,47 +7,125 @@ process downloadUniprotViruses {
   storeDir params.store_dir
   errorStrategy 'finish'
   output:
-    file "virusesUniprot.pep.fasta" into uniref_virusFasta,uniref_virusFasta_ch2
-    file "uniprot_sprot_viruses.dat.gz" into uniprot_sprot_viruses
-    file "uniprot_trembl_viruses.dat.gz" into uniprot_trembl_viruses
+    file "virusesUniprot.pep.fasta" into uniref_virusFasta
+    file "uniprot_total_viruses.dat.gz" into uniprot_total_viruses
   script:
     """
-    ##See here for parsing script: https://www.biostars.org/p/153531/#154847
+    ##See here for parsing awk oneliner: https://www.biostars.org/p/153531/#154847
     ##wget -t 3 -O virusesUniprot.pep.fasta.gz "https://www.uniprot.org/uniprot/?query=taxonomy%3A%22Viruses+%5B10239%5D%22&format=fasta&compress=yes"
     wget -t 3 -O uniprot_sprot_viruses.dat.gz "ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/taxonomic_divisions/uniprot_sprot_viruses.dat.gz"
     wget -t 3 -O uniprot_trembl_viruses.dat.gz "ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/taxonomic_divisions/uniprot_trembl_viruses.dat.gz"
-    zcat ./*.dat.gz | awk '{if (/^ /) {gsub(/ /, ""); print} else if (/^ID/) print ">" \$2}' > virusesUniprot.pep.fasta
-    #rm -f virusesUniprot.pep.fasta.gz
+    cat uniprot_sprot_viruses.dat.gz >> uniprot_trembl_viruses.dat.gz
+    rm -f uniprot_sprot_viruses.dat.gz
+    mv uniprot_trembl_viruses.dat.gz uniprot_total_viruses.dat.gz
+    zcat uniprot_total_viruses.dat.gz | awk '{if (/^ /) {gsub(/ /, ""); print} else if (/^ID/) print ">" \$2}' > virusesUniprot.pep.fasta
     """
-}
-
-process downloadUniprotIDMapping {
-storeDir params.store_dir
-input:
- file virusFasta from uniref_virusFasta_ch2
-output:
- file "idmapping_subset.tab.gz" into idmapping_file
-script:
-"""
-seqkit fx2tab -ni ${virusFasta} > virus_fasta.ids.txt
-wget -t 3 -O idmapping_selected.tab.gz "ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/idmapping_selected.tab.gz"
-zcat idmapping_selected.tab.gz | grep -f virus_fasta.ids.txt | gzip > idmapping_subset.tab.gz
-rm -f idmapping_selected.tab.gz
-"""
 }
 
 process downloadNCBItaxdump {
 storeDir params.store_dir
 output:
+ file "data/taxdump.tar.gz" into ncbi_taxonomy_dump
  file "data/nodes.dmp" into ncbi_nodes
  file "data/names.dmp" into ncbi_names
 script:
 """
 wget ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz -P data/
 tar zxf data/taxdump.tar.gz -C data/ nodes.dmp names.dmp
-rm -f data/taxdump.tar.gz
 """
 }
+
+process setupETE3TaxonomyDatabase {
+conda "ete3 biopython"
+storeDir params.store_dir
+input:
+ file ncbi_taxonomy from ncbi_taxonomy_dump
+output:
+ file "ete3_taxa.sqlite" into ete3_taxonomy_database
+script:
+"""
+#!/usr/bin/env python
+from ete3 import Tree
+from ete3 import NCBITaxa
+from pathlib import Path
+Path('ete3_taxa.sqlite').touch()
+ncbi = NCBITaxa("ete3_taxa.sqlite")
+ncbi.update_taxonomy_database("${ncbi_taxonomy}")
+"""
+}
+
+process downloadUniprotTaxonMapping {
+storeDir params.store_dir
+output:
+ file "uniprot2taxonid.tsv" into uniprot_taxon_mapping
+script:
+"""
+wget -O - "ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/idmapping.dat.gz" | zless | grep -P "\tNCBI_TaxID\t" > uniprot2taxonid.tsv
+"""
+}
+
+////This process works, but is waaay too slow
+////not sure if there is a premade file that has
+////the annotation of which host organism the virus is from.
+////
+////
+//process parseUniprotTaxonMapping {
+//conda "ete3 biopython"
+//storeDir params.store_dir
+//input:
+ //file ete3_taxonomy from ete3_taxonomy_database
+ //file virusSwissFile from uniprot_total_viruses
+//output:
+ //file "taxon_lookup.txt" into taxon_lookup_file
+/script:
+//"""
+//#!/usr/bin/env python
+//import gzip
+//import Bio
+//from Bio import SeqIO
+//from ete3 import Tree
+//from ete3 import NCBITaxa
+//import os
+
+//ncbi = NCBITaxa("${ete3_taxonomy}")
+//write_handle = open("taxon_lookup.txt","w")
+//read_handle = gzip.open("${virusSwissFile}")
+//for record in SeqIO.parse(read_handle, "swiss"):
+//    assert len(record.annotations['ncbi_taxid']) == 1
+//    
+//    taxid = record.annotations['ncbi_taxid']
+//    virus_obj = ncbi.get_taxid_translator(taxid)
+//    keys = list(virus_obj)
+//    if len(keys) > 0:
+//        theKey = keys[0]
+//        virus_name = virus_obj[theKey]
+//    else:
+//        virus_name = "virus name parse error"
+//        
+//    if 'host_ncbi_taxid' in record.annotations.keys():
+//        host_taxid = record.annotations['host_ncbi_taxid']
+//        ##print(record.id,taxid,host_taxid,record.name)
+//    else:
+//        ##Derive our own host species identifier, from the name of the virus
+//        #putative_genus = virus_name.split(" ")[0]
+//        #putative_species = virus_name.split(" ")[1]
+//        #genus_species =[putative_genus+" "+putative_species]
+//        #looked_up_taxon = ncbi.get_name_translator(genus_species)
+//        looked_up_taxon = False ######<<<< This disables the lookup, basically
+//        ##It is disabled, as it works for simple cases "Drosophila melanogaster", but not others
+//        if bool(looked_up_taxon) == False:
+//            ##No hit
+//            host_taxid = ['N/A']
+//        else:
+//            ##Found a hit
+//            theName = list(looked_up_taxon)[0]
+//            host_taxid = looked_up_taxon[theName]
+//    theString = "\t".join([record.id,taxid[0],str(host_taxid),record.name,virus_name])
+//    write_handle.write(theString+os.linesep)
+//write_handle.close()
+//read_handle.close()
+//"""
+//}
 
 process clone_BlobTools {
 conda "anaconda matplotlib docopt tqdm wget pyyaml git pysam"
@@ -78,7 +156,8 @@ process downloadNCBIRefSeqViruses {
     """
 }
 
-ncbi_virusFasta.mix(uniref_virusFasta).into{virusFastas_ch1;virusFastas_ch2}
+uniref_virusFasta.into{virusFastas_ch1;virusFastas_ch2}
+//ncbi_virusFasta.mix(uniref_virusFasta).into{virusFastas_ch1;virusFastas_ch2}
 
 process filterOutPhages {
   conda "seqkit"
@@ -187,7 +266,6 @@ sleep 15
 dmnd_results.groupTuple().into{mergeableResults_ch;printme_ch}
 printme_ch.subscribe{ println it }
 
-
 process mergeResults {
 publishDir "results"
 input:
@@ -202,7 +280,7 @@ cat result_files.txt | xargs cat | grep -vP "^@" | sort -g -k 11,11 >> ${key}_me
 """
 }
 
-mergedResults_ch.combine(blobtools_dir).combine(idmapping_file).set{taxifyTuples}
+mergedResults_ch.combine(blobtools_dir).combine(taxon_lookup_file).set{taxifyTuples}
 
 process taxifyResults {
 conda "anaconda matplotlib docopt tqdm wget pyyaml git pysam"
@@ -221,6 +299,7 @@ ${blobtools}/blobtools taxify --hit_file ${results} \
   --taxid_mapping_file \${TAXID_NAME_NOGZ} \
   --map_col_sseqid 0 \
   --map_col_taxid 1
+
 rm -f \${TAXID_NAME_NOGZ}
 """
 }
