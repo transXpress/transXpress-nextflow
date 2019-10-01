@@ -14,6 +14,7 @@ From: continuumio/miniconda3
 
 %post
     bash -c echo ##Just a dummy line, to help initialize bash?
+    /opt/conda/bin/conda init bash
     echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc
     echo "source activate $(head -1 environment.yml | cut -d' ' -f2)" >> ~/.bashrc
     /opt/conda/bin/conda env create -f environment.yml
