@@ -211,6 +211,7 @@ relativeSamples_ch.into{ samples_file_toTrinity; relativeSamples_toTrinityFinish
 
 process trimmomatic {
 cpus params.general_CPUs
+queue params.queue_standard_nodes
 input:
  set file(R1_reads),file(R2_reads) from trimReadPairs_ch
  file "adapters.fasta" from file(params.trimmomatic_adapter_file)
@@ -241,6 +242,7 @@ filteredPairedReads_toTrinity.collect().into{ trinityInchwormPairedReads ; trini
 process fastqc {
 publishDir "transXpress_results/fastqc_results/", mode: "copy"
 cpus params.general_CPUs
+queue params.queue_standard_nodes
 input:
  set file(R1_reads),file(R2_reads) from fastqcReadPairs_ch
 tag {"$R1_reads"+" and " +"$R2_reads"}
@@ -336,7 +338,7 @@ process trinityInchwormChrysalis {
   cache 'lenient'
   cpus params.assembly_CPUs
   memory params.assembly_MEM+" GB"
-
+  queue params.queue_standard_nodes
   tag { dateMetadataPrefix+"Trinity" }
 
   afterScript 'echo \"(Above completion message is from Trinity. transXpress will continue the pipeline execution.)\"'
@@ -386,6 +388,7 @@ process trinityButterflyParallelVersion2 {
   //https://github.com/biocorecrg/transcriptome_assembly/blob/564f6af2e4db9625ae9de6884a6524b4ec57cece/denovo_assembly/denovo_assembly.nf#L183
   cache 'lenient'
   cpus params.assembly_CPUs
+  queue params.queue_standard_nodes
   input:
     file "trinity_out_dir/*" from trinityWorkDirRootFiles_ch1
     file "trinity_out_dir/chrysalis/*" from trinityWorkDirChrysalisFiles_ch1
@@ -459,7 +462,7 @@ process trinityFinish {
 process runSPAdes {
 cpus params.assembly_CPUs
 memory params.assembly_MEM+" GB"
-
+queue params.queue_highmemory_nodes
 input:
    file filteredPairedReads from filteredPairedReads_toRnaspades.collect()
    file datasets_YAML from yaml_rnaSPAdes_ch
@@ -502,6 +505,7 @@ process renameAssembly {
 
 process transdecoderLongOrfs {
   publishDir "transXpress_results", mode: "copy"
+  queue params.queue_standard_nodes
   input:
     set val(assemblerName),file(transcriptomeTransdecoder) from transcriptomeToTransdecoder
   output:
@@ -521,6 +525,7 @@ process transdecoderLongOrfs {
 process kallisto {
   publishDir "transXpress_results", mode: "copy"
   cpus params.assembly_CPUs
+  queue params.queue_standard_nodes
   input:
     file filteredReadsFromPairs from filteredPairedReads_toKallisto.collect() //This flattens the tuples
     set val(assemblerKallisto), file(transcriptomeKallisto), file(geneTransMap) from transcriptomeGeneTransMapKallisto
@@ -549,6 +554,7 @@ normalizedKallistoTable
     .into { transcriptExpression; expressionStats }
 
 process trinityStats {
+  executor 'local'
   publishDir "transXpress_results", mode: "copy"
   cpus 1
   input:
@@ -580,6 +586,7 @@ longOrfsProteomeSplit
 
 process sprotBlastxParallel {
   cpus 2
+  queue params.queue_shorttime_nodes
   input:
     file chunk from sprotBlastxChunks
     set sprotDb, sprotDbIndex from sprotDb
@@ -596,6 +603,7 @@ process sprotBlastxParallel {
 
 process sprotBlastpParallel {
   cpus 2
+  queue params.queue_shorttime_nodes
   input:
     file chunk from sprotBlastpChunks
     set sprotDb, sprotDbIndex from sprotDb
@@ -614,6 +622,7 @@ sprotBlastpResults.collectFile(name: 'blastp_annotations.tsv').into { blastpForT
 
 process pfamParallel {
   cpus 2
+  queue params.queue_shorttime_nodes
   input:
     file chunk from transdecoderPfamChunks
     set pfamDb, pfamDbIndex from pfamDb
@@ -634,6 +643,7 @@ pfamDomResults.collectFile(name: 'pfam_dom_annotations.txt').into { pfamDomResul
 
 process rfamParallel {
   cpus 2
+  queue params.queue_shorttime_nodes
   input:
     file chunk from rfamChunks
     set rfamDb, rfamDbIndex from rfamDb
@@ -666,6 +676,7 @@ process publishRfamResults {
 
 process transdecoderPredict {
   publishDir "transXpress_results", mode: "copy" // , saveAs: { filename -> "transcriptome_after_predict.pep" }
+  queue params.queue_standard_nodes
   input:
     set val(assembler),file(transcriptomeFile) from transcriptomeTransdecoderPredict
     file "${transcriptomeFile}.transdecoder_dir/*" from transdecoderLongOrfsDirFiles
@@ -696,6 +707,7 @@ signalpChunks.into{ signalp4Chunks ; signalp5Chunks}
 proteomeToPfamRevise.combine(revisePfamChunks).set{ combinedToPfamRevise }
 
 process revisePfamResults {
+executor 'local'
 input:
  set file(proteome),file(longOrfChunk),file(hmmerscanDomFile) from combinedToPfamRevise
 output:
@@ -728,7 +740,7 @@ fi
 
 process pfamToGff3 {
 publishDir "transXpress_results", mode: "copy"
-
+executor 'local'
 input:
 file pfamDomResult from pfamToGff3Doms
 file refGFF3 from transdecoderGFF3ToPfam
@@ -748,6 +760,7 @@ touch pfam_domains.gff3
 
 process signalp4Parallel {
   cpus 1
+  queue params.queue_shorttime_nodes
   input:
     file chunk from signalp4Chunks
   output:
@@ -766,6 +779,7 @@ process signalp4Parallel {
 
 process signalp5Parallel {
   cpus 1
+  queue params.queue_shorttime_nodes
   input:
     file chunk from signalp5Chunks
   output:
@@ -790,6 +804,7 @@ signalp5ResultsGff3.collectFile(name: 'signalp5_annotations.gff3').into{ signalp
 
 
 process deeplocParallel {
+  queue params.queue_shorttime_nodes
   input:
     file chunk from deeplocChunks
   output:
@@ -811,6 +826,7 @@ process deeplocParallel {
 
 //TODO: Update this to tmhmm.py, which is on conda?
 process tmhmmParallel {
+  queue params.queue_shorttime_nodes
   cpus 1
   input:
     file chunk from tmhmmChunks
