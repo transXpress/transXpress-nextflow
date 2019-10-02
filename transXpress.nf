@@ -18,6 +18,7 @@ Channel.empty().set{readsTuple}
 }
 
 process download_sra_reads {
+    beforeScript params.before_script_cmds
     input:
      set val(sample_id), val(readFiles) from readsTuple
     output:
@@ -86,6 +87,7 @@ log.info """
 process downloadEggNOG {
   executor 'local'
   storeDir params.storeDB
+  beforeScript params.before_script_cmds
   output:
     file "NOG.annotations.tsv" into eggNOGDb
   script:
@@ -95,23 +97,10 @@ process downloadEggNOG {
     """
 }
 
-process downloadVirusesUniref50 {
-  executor 'local'
-  storeDir params.storeDB
-  errorStrategy 'ignore'
-  output:
-    set file("virusesUniref50.pep.fasta"), file("virusesUniref50.pep.fasta.p??") into virusDb
-  script:
-    """
-    wget -t 3 -O virusesUniref50.pep.fasta.gz "https://www.uniprot.org/uniref/?query=uniprot%3A%28taxonomy%3A%22Viruses+%5B10239%5D%22%29+AND+identity%3A0.5&format=fasta&compress=yes"
-    gunzip virusesUniref50.pep.fasta.gz
-    makeblastdb -in virusesUniref50.pep.fasta -dbtype prot
-    """
-}
-
 process downloadRfam {
   executor 'local'
   storeDir params.storeDB
+  beforeScript params.before_script_cmds
   output:
     set file("Rfam.cm"), file("Rfam.cm.???") into rfamDb
   script:
@@ -125,6 +114,7 @@ process downloadRfam {
 process downloadSprot {
   executor 'local'
   storeDir params.storeDB
+  beforeScript params.before_script_cmds
   output:
     set file("uniprot_sprot.fasta"), file("uniprot_sprot.fasta.p??") into sprotDb
   script:
@@ -138,6 +128,7 @@ process downloadSprot {
 process downloadPfam {
   executor 'local'
   storeDir params.storeDB
+  beforeScript params.before_script_cmds
   output:
     set file("Pfam-A.hmm"), file("Pfam-A.hmm.h??") into pfamDb
   script:
@@ -159,6 +150,7 @@ process downloadPfam {
 
 process loadSamples {
 executor 'local'
+beforeScript params.before_script_cmds
 input:
   file "samples.tsv" from file(params.samples)
 output:
@@ -180,6 +172,7 @@ readPairs_ch.into{ trimReadPairs_ch ; fastqcReadPairs_ch }
 //Once the sample files are loaded into Nextflow channels, everything should be specified relatively
 process convertSamplesToRelative {
 executor 'local'
+beforeScript params.before_script_cmds
 input:
     file toRelative
 output:
@@ -212,6 +205,8 @@ relativeSamples_ch.into{ samples_file_toTrinity; relativeSamples_toTrinityFinish
 process trimmomatic {
 cpus params.general_CPUs
 queue params.queue_standard_nodes
+clusterOptions params.cluster_options
+beforeScript params.before_script_cmds
 input:
  set file(R1_reads),file(R2_reads) from trimReadPairs_ch
  file "adapters.fasta" from file(params.trimmomatic_adapter_file)
@@ -243,6 +238,8 @@ process fastqc {
 publishDir "transXpress_results/fastqc_results/", mode: "copy"
 cpus params.general_CPUs
 queue params.queue_standard_nodes
+clusterOptions params.cluster_options
+beforeScript params.before_script_cmds
 input:
  set file(R1_reads),file(R2_reads) from fastqcReadPairs_ch
 tag {"$R1_reads"+" and " +"$R2_reads"}
@@ -279,6 +276,7 @@ sleep 15 ##Not a super important process, so might as well put in a delay to hel
 //This produces the samples file for rnaspades
 process relativeSamplesToYAML {
 executor 'local'
+beforeScript params.before_script_cmds
 input:
     file samples_file_toYAMLConvert
     //file filteredPairedReads from filteredPairedReads_toYAML.collect() //collect flattens the tuple. This input ensures the process waits until trimmomatic is all done, and also allows for assertions as a sanity check
@@ -339,6 +337,8 @@ process trinityInchwormChrysalis {
   cpus params.assembly_CPUs
   memory params.assembly_MEM+" GB"
   queue params.queue_standard_nodes
+  clusterOptions params.cluster_options
+  beforeScript params.before_script_cmds
   tag { dateMetadataPrefix+"Trinity" }
 
   afterScript 'echo \"(Above completion message is from Trinity. transXpress will continue the pipeline execution.)\"'
@@ -382,13 +382,16 @@ trinityPhase1ReadPartitionsFiles_ch.flatten().map{ file ->
                                         .set{ partitionedReadGroups_ch }
 	//Add .groupTuple() to execute in groups by the directories
 
-process trinityButterflyParallelVersion2 {
+process trinityButterflyParallel {
   //TODO This process has hardcoded parameters.  It should really be getting them from the TRINITY params...
   //See here for an alternative approach to this node:
   //https://github.com/biocorecrg/transcriptome_assembly/blob/564f6af2e4db9625ae9de6884a6524b4ec57cece/denovo_assembly/denovo_assembly.nf#L183
   cache 'lenient'
+  maxForks params.max_forks
   cpus params.assembly_CPUs
   queue params.queue_standard_nodes
+  clusterOptions params.cluster_options
+  beforeScript params.before_script_cmds
   input:
     file "trinity_out_dir/*" from trinityWorkDirRootFiles_ch1
     file "trinity_out_dir/chrysalis/*" from trinityWorkDirChrysalisFiles_ch1
@@ -427,6 +430,7 @@ process trinityButterflyParallelVersion2 {
 
 process trinityFinish {
    publishDir "transXpress_results", mode: "copy", saveAs: { filename -> filename.replaceAll("trinity_out_dir/Trinity", "transcriptome") }
+   beforeScript params.before_script_cmds
   input:
     file "trinity_out_dir/*" from trinityWorkDirRootFiles_ch2 //An attempt to relativize the butterfly processes
     file "trinity_out_dir/chrysalis/*" from trinityWorkDirChrysalisFiles_ch2 //An attempt to relativize the butterfly processes
@@ -439,6 +443,7 @@ process trinityFinish {
     set val("Trinity"), file("./trinity_out_dir/Trinity.fasta.gene_trans_map"),file("./trinity_out_dir/Trinity.fasta") into trinityFinalOutput
     file "./trinity_out_dir/recursive_trinity.cmds.completed"
   memory "1 GB"
+  cpus 1
   tag { dateMetadataPrefix+"Trinity" }
   script:
     """
@@ -463,6 +468,8 @@ process runSPAdes {
 cpus params.assembly_CPUs
 memory params.assembly_MEM+" GB"
 queue params.queue_highmemory_nodes
+clusterOptions params.cluster_options
+beforeScript params.before_script_cmds
 input:
    file filteredPairedReads from filteredPairedReads_toRnaspades.collect()
    file datasets_YAML from yaml_rnaSPAdes_ch
@@ -484,6 +491,7 @@ trinityFinalOutput.mix(rnaSPAdesFinalOutput).set{ finishedAssemblies }
 process renameAssembly {
    executor 'local'
    publishDir "transXpress_results", mode: "copy"
+   beforeScript params.before_script_cmds
    input:
     set val(assembler), file(geneTransMap), file(transcriptome_fasta) from finishedAssemblies
     file "prefix.txt" from file(params.prefix_add_metadata_file) //Just a dummy input to include the file on the DAG
@@ -506,6 +514,10 @@ process renameAssembly {
 process transdecoderLongOrfs {
   publishDir "transXpress_results", mode: "copy"
   queue params.queue_standard_nodes
+  clusterOptions params.cluster_options
+  cpus 1
+  memory "5 GB"
+  beforeScript params.before_script_cmds
   input:
     set val(assemblerName),file(transcriptomeTransdecoder) from transcriptomeToTransdecoder
   output:
@@ -517,7 +529,7 @@ process transdecoderLongOrfs {
   tag { dateMetadataPrefix+"${assemblerName}" }
   script:
     """
-    TransDecoder.LongOrfs -t ${transcriptomeTransdecoder}
+    TransDecoder.LongOrfs -t ${transcriptomeTransdecoder} -m 30 //Minimum protein length = -m amino acids
     #chmod -R a-w ${transcriptomeTransdecoder}.transdecoder_dir/ ##write protect the output to troubleshoot downstream accessing.
     """
 }
@@ -526,6 +538,8 @@ process kallisto {
   publishDir "transXpress_results", mode: "copy"
   cpus params.assembly_CPUs
   queue params.queue_standard_nodes
+  clusterOptions params.cluster_options
+  beforeScript params.before_script_cmds
   input:
     file filteredReadsFromPairs from filteredPairedReads_toKallisto.collect() //This flattens the tuples
     set val(assemblerKallisto), file(transcriptomeKallisto), file(geneTransMap) from transcriptomeGeneTransMapKallisto
@@ -557,6 +571,7 @@ process trinityStats {
   executor 'local'
   publishDir "transXpress_results", mode: "copy"
   cpus 1
+  beforeScript params.before_script_cmds
   input:
     set val(assemblerStats), file(transcriptomeStats) from transcriptomeToStats
     file expressionStats
@@ -585,8 +600,11 @@ longOrfsProteomeSplit
 
 
 process sprotBlastxParallel {
-  cpus 2
+  maxForks params.max_forks/3
+  cpus params.general_CPUs
   queue params.queue_shorttime_nodes
+  clusterOptions params.cluster_options
+  beforeScript params.before_script_cmds
   input:
     file chunk from sprotBlastxChunks
     set sprotDb, sprotDbIndex from sprotDb
@@ -602,8 +620,11 @@ process sprotBlastxParallel {
 
 
 process sprotBlastpParallel {
-  cpus 2
+  maxForks params.max_forks/3
+  cpus params.general_CPUs
   queue params.queue_shorttime_nodes
+  clusterOptions params.cluster_options
+  beforeScript params.before_script_cmds
   input:
     file chunk from sprotBlastpChunks
     set sprotDb, sprotDbIndex from sprotDb
@@ -621,8 +642,11 @@ sprotBlastpResults.collectFile(name: 'blastp_annotations.tsv').into { blastpForT
 
 
 process pfamParallel {
-  cpus 2
+  maxForks params.max_forks/3
+  cpus params.general_CPUs
   queue params.queue_shorttime_nodes
+  clusterOptions params.cluster_options
+  beforeScript params.before_script_cmds
   input:
     file chunk from transdecoderPfamChunks
     set pfamDb, pfamDbIndex from pfamDb
@@ -642,8 +666,11 @@ pfamDomResults.collectFile(name: 'pfam_dom_annotations.txt').into { pfamDomResul
 
 
 process rfamParallel {
-  cpus 2
+  maxForks params.max_forks/3
+  cpus params.general_CPUs
   queue params.queue_shorttime_nodes
+  clusterOptions params.cluster_options
+  beforeScript params.before_script_cmds
   input:
     file chunk from rfamChunks
     set rfamDb, rfamDbIndex from rfamDb
@@ -661,6 +688,7 @@ process rfamParallel {
 process publishRfamResults {
   executor 'local'
   publishDir "transXpress_results", mode: "copy"
+  beforeScript params.before_script_cmds
   input:
     file rfamResult from rfamResults.collectFile(name: 'rfam_annotations_unsorted.txt')
   output:
@@ -676,7 +704,10 @@ process publishRfamResults {
 
 process transdecoderPredict {
   publishDir "transXpress_results", mode: "copy" // , saveAs: { filename -> "transcriptome_after_predict.pep" }
+  cpus 1
   queue params.queue_standard_nodes
+  clusterOptions params.cluster_options
+  beforeScript params.before_script_cmds
   input:
     set val(assembler),file(transcriptomeFile) from transcriptomeTransdecoderPredict
     file "${transcriptomeFile}.transdecoder_dir/*" from transdecoderLongOrfsDirFiles
@@ -708,6 +739,7 @@ proteomeToPfamRevise.combine(revisePfamChunks).set{ combinedToPfamRevise }
 
 process revisePfamResults {
 executor 'local'
+beforeScript params.before_script_cmds
 input:
  set file(proteome),file(longOrfChunk),file(hmmerscanDomFile) from combinedToPfamRevise
 output:
@@ -741,6 +773,7 @@ fi
 process pfamToGff3 {
 publishDir "transXpress_results", mode: "copy"
 executor 'local'
+beforeScript params.before_script_cmds
 input:
 file pfamDomResult from pfamToGff3Doms
 file refGFF3 from transdecoderGFF3ToPfam
@@ -761,6 +794,8 @@ touch pfam_domains.gff3
 process signalp4Parallel {
   cpus 1
   queue params.queue_shorttime_nodes
+  clusterOptions params.cluster_options
+  beforeScript params.before_script_cmds
   input:
     file chunk from signalp4Chunks
   output:
@@ -780,6 +815,8 @@ process signalp4Parallel {
 process signalp5Parallel {
   cpus 1
   queue params.queue_shorttime_nodes
+  clusterOptions params.cluster_options
+  beforeScript params.before_script_cmds
   input:
     file chunk from signalp5Chunks
   output:
@@ -805,6 +842,8 @@ signalp5ResultsGff3.collectFile(name: 'signalp5_annotations.gff3').into{ signalp
 
 process deeplocParallel {
   queue params.queue_shorttime_nodes
+  clusterOptions params.cluster_options
+  beforeScript params.before_script_cmds
   input:
     file chunk from deeplocChunks
   output:
@@ -815,7 +854,7 @@ process deeplocParallel {
     if hash deeploc 2>/dev/null;
     then
     export MKL_THREADING_LAYER=GNU
-    eexport PATH="/lab/solexa_weng/testtube/miniconda3/bin:$PATH"
+    export PATH="/lab/solexa_weng/testtube/miniconda3/bin:$PATH"
     deeploc -f ${chunk} -o ${chunk}.out
     else
     echo "Unable to find deeploc, so making dummy files instead"
@@ -827,6 +866,8 @@ process deeplocParallel {
 //TODO: Update this to tmhmm.py, which is on conda?
 process tmhmmParallel {
   queue params.queue_shorttime_nodes
+  clusterOptions params.cluster_options
+  beforeScript params.before_script_cmds
   cpus 1
   input:
     file chunk from tmhmmChunks
@@ -853,6 +894,7 @@ tmhmmResults.collectFile(name: 'tmhmm_annotations.tsv').into{ tmhmmResultToAnnot
 
 process tmhmmMakeGff3 {
 executor 'local'
+beforeScript params.before_script_cmds
 input:
  file tmhmmResultToGff3
 tag{ dateMetadataPrefix }
@@ -891,6 +933,7 @@ transdecoderGFF3ToLiftover.combine(combinedGff3s.collectFile(name: 'collected.gf
 
 process liftoverPeptideGff3ToTranscript {
 executor 'local'
+beforeScript params.before_script_cmds
 input:
  set file(transdecoderGFF3ToLiftover), file(gff3FilesToLiftover) from liftOverGffsTuple
 
@@ -964,7 +1007,9 @@ liftoverResults.collectFile(name: 'liftover_results.gff3').set{ liftoverResult  
 
 // Collect parallelized annotations
 process annotatedFasta {
+  executor 'local'
   publishDir "transXpress_results", mode: "copy"
+  beforeScript params.before_script_cmds
   input:
     set val(assemblyAnnotation),file(transcriptomeFile) from transcriptomeToAnnotation
     file proteomeFile from proteomeToAnnotation
@@ -1109,6 +1154,7 @@ transcriptome_annotated_pep_ch.into { transcriptome_annotated_pep_ch1 ; transcri
 process final_checksum {
     executor 'local'
     publishDir "transXpress_results", mode: "copy"
+    beforeScript params.before_script_cmds
     input:
         file "transcriptome_annotated.fasta" from transcriptome_annotated_fasta_ch1
         file "transcriptome_annotated.pep" from transcriptome_annotated_pep_ch1
