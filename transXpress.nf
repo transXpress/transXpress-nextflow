@@ -529,7 +529,7 @@ process transdecoderLongOrfs {
   tag { dateMetadataPrefix+"${assemblerName}" }
   script:
     """
-    TransDecoder.LongOrfs -t ${transcriptomeTransdecoder} -m 30 //Minimum protein length = -m amino acids
+    TransDecoder.LongOrfs -t ${transcriptomeTransdecoder} -m 30 ##Minimum protein length = -m amino acids
     #chmod -R a-w ${transcriptomeTransdecoder}.transdecoder_dir/ ##write protect the output to troubleshoot downstream accessing.
     """
 }
@@ -600,7 +600,7 @@ longOrfsProteomeSplit
 
 
 process sprotBlastxParallel {
-  maxForks params.max_forks/3
+  maxForks params.max_forks
   cpus params.general_CPUs
   queue params.queue_shorttime_nodes
   clusterOptions params.cluster_options
@@ -620,7 +620,7 @@ process sprotBlastxParallel {
 
 
 process sprotBlastpParallel {
-  maxForks params.max_forks/3
+  maxForks params.max_forks
   cpus params.general_CPUs
   queue params.queue_shorttime_nodes
   clusterOptions params.cluster_options
@@ -642,7 +642,7 @@ sprotBlastpResults.collectFile(name: 'blastp_annotations.tsv').into { blastpForT
 
 
 process pfamParallel {
-  maxForks params.max_forks/3
+  maxForks params.max_forks
   cpus params.general_CPUs
   queue params.queue_shorttime_nodes
   clusterOptions params.cluster_options
@@ -666,7 +666,7 @@ pfamDomResults.collectFile(name: 'pfam_dom_annotations.txt').into { pfamDomResul
 
 
 process rfamParallel {
-  maxForks params.max_forks/3
+  maxForks params.max_forks
   cpus params.general_CPUs
   queue params.queue_shorttime_nodes
   clusterOptions params.cluster_options
