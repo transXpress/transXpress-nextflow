@@ -429,6 +429,8 @@ process trinityButterflyParallel {
 
 
 process trinityFinish {
+   cache "deep"
+   executor "local"
    publishDir "transXpress_results", mode: "copy", saveAs: { filename -> filename.replaceAll("trinity_out_dir/Trinity", "transcriptome") }
    beforeScript params.before_script_cmds
   input:
