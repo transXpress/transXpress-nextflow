@@ -19,6 +19,7 @@ Channel.empty().set{readsTuple}
 
 process download_sra_reads {
     beforeScript params.before_script_cmds
+    cpus 1
     input:
      set val(sample_id), val(readFiles) from readsTuple
     output:
@@ -86,6 +87,7 @@ log.info """
 
 process downloadEggNOG {
   executor 'local'
+  cpus 1
   storeDir params.storeDB
   beforeScript params.before_script_cmds
   output:
@@ -99,6 +101,7 @@ process downloadEggNOG {
 
 process downloadRfam {
   executor 'local'
+  cpus 1
   storeDir params.storeDB
   beforeScript params.before_script_cmds
   output:
@@ -113,6 +116,7 @@ process downloadRfam {
 
 process downloadSprot {
   executor 'local'
+  cpus 1
   storeDir params.storeDB
   beforeScript params.before_script_cmds
   output:
@@ -127,6 +131,7 @@ process downloadSprot {
 
 process downloadPfam {
   executor 'local'
+  cpus 1
   storeDir params.storeDB
   beforeScript params.before_script_cmds
   output:
@@ -276,6 +281,7 @@ sleep 15 ##Not a super important process, so might as well put in a delay to hel
 //This produces the samples file for rnaspades
 process relativeSamplesToYAML {
 executor 'local'
+cpus 1
 beforeScript params.before_script_cmds
 input:
     file samples_file_toYAMLConvert
@@ -336,7 +342,7 @@ process trinityInchwormChrysalis {
   cache 'lenient'
   cpus params.assembly_CPUs
   memory params.assembly_MEM+" GB"
-  queue params.queue_standard_nodes
+  queue params.queue_highmemory_nodes
   clusterOptions params.cluster_options
   beforeScript params.before_script_cmds
   tag { dateMetadataPrefix+"Trinity" }
@@ -388,7 +394,7 @@ process trinityButterflyParallel {
   //https://github.com/biocorecrg/transcriptome_assembly/blob/564f6af2e4db9625ae9de6884a6524b4ec57cece/denovo_assembly/denovo_assembly.nf#L183
   cache 'lenient'
   maxForks params.max_forks
-  cpus params.assembly_CPUs
+  cpus params.general_CPUs
   queue params.queue_standard_nodes
   clusterOptions params.cluster_options
   beforeScript params.before_script_cmds
@@ -452,11 +458,12 @@ process trinityFinish {
     mkdir trinity_out_dir/read_partitions/
     mkdir trinity_out_dir/read_partitions/Fb_0/
     mkdir trinity_out_dir/read_partitions/Fb_0/CBin_0 ##This is just a dummy directory to fool Trinity
-    for f in ./*.fasta
-    do
+    sleep 15 ##Filesystem latency errors?
+    ls -1L | grep ".fasta" > fasta_files.txt
+    while read f; do
      ##Link the files into a directory structure that Trinity can deal with correctly, even if it isn't 100% right
-     ln -s ../../../../\$f trinity_out_dir/read_partitions/Fb_0/CBin_0/
-    done
+     ln -s "../../../../\$f" "trinity_out_dir/read_partitions/Fb_0/CBin_0/."
+    done < fasta_files.txt
     ##Have to produce these files to trick Trinity into thinking things are done
     cp ${trinityCmdsCollected} trinity_out_dir/recursive_trinity.cmds
     cp ${finishedCommands} trinity_out_dir/recursive_trinity.cmds.completed
@@ -538,7 +545,7 @@ process transdecoderLongOrfs {
 
 process kallisto {
   publishDir "transXpress_results", mode: "copy"
-  cpus params.assembly_CPUs
+  cpus params.general_CPUs
   queue params.queue_standard_nodes
   clusterOptions params.cluster_options
   beforeScript params.before_script_cmds
@@ -691,6 +698,7 @@ process publishRfamResults {
   executor 'local'
   publishDir "transXpress_results", mode: "copy"
   beforeScript params.before_script_cmds
+  cpus 1
   input:
     file rfamResult from rfamResults.collectFile(name: 'rfam_annotations_unsorted.txt')
   output:
@@ -741,6 +749,7 @@ proteomeToPfamRevise.combine(revisePfamChunks).set{ combinedToPfamRevise }
 
 process revisePfamResults {
 executor 'local'
+cpus 1
 beforeScript params.before_script_cmds
 input:
  set file(proteome),file(longOrfChunk),file(hmmerscanDomFile) from combinedToPfamRevise
@@ -752,6 +761,7 @@ script:
 seqkit fx2tab -n -i ${longOrfChunk} | cut -f 1 > ids.txt
 seqkit grep -f ids.txt ${proteome} > post-predict_subset.fasta
 seqkit grep -s -f <(seqkit seq -s ${longOrfChunk}) post-predict_subset.fasta > common.fasta ##Find all the fasta records where the sequences match exactly.
+seqkit grep -v -s -f <(seqkit seq -s ${longOrfChunk}) post-predict_subset.fasta > differing.fasta ##Find all the fasta records where the sequences differ.
 
 predictLen=`cat post-predict_subset.fasta | grep ">" | wc -l`
 commonLen=`cat common.fasta | grep ">" | wc -l`
@@ -761,11 +771,9 @@ then
       echo "no changes between the longorfs and transdecoder predict versions"
       touch test.txt
 else
-      ##TODO, maybe delete this whole process. I was under the impression that 
-      ##the transdecoder peptides would change after transdecoder predict
-      ##But seems this isn't true?
-      ##Or at least I haven't seen this get triggered w/ the test datasets
+      ##This does get triggered with the test datasets, at least with the short peptides.    
       echo "changes detected"
+      touch test.txt
 fi
 
 
@@ -775,6 +783,7 @@ fi
 process pfamToGff3 {
 publishDir "transXpress_results", mode: "copy"
 executor 'local'
+cpus 1
 beforeScript params.before_script_cmds
 input:
 file pfamDomResult from pfamToGff3Doms
@@ -844,6 +853,7 @@ signalp5ResultsGff3.collectFile(name: 'signalp5_annotations.gff3').into{ signalp
 
 process deeplocParallel {
   queue params.queue_shorttime_nodes
+  cpus 1
   clusterOptions params.cluster_options
   beforeScript params.before_script_cmds
   input:
@@ -865,14 +875,16 @@ process deeplocParallel {
     """
 }
 
+tmhmmChunks.into{tmhmmChunks_ch1; tmhmmChunks_ch2}
+
 //TODO: Update this to tmhmm.py, which is on conda?
 process tmhmmParallel {
+  cpus 1
   queue params.queue_shorttime_nodes
   clusterOptions params.cluster_options
   beforeScript params.before_script_cmds
-  cpus 1
   input:
-    file chunk from tmhmmChunks
+    file chunk from tmhmmChunks_ch1
   output:
     file "tmhmm_out" into tmhmmResults
   tag { chunk }
@@ -894,8 +906,33 @@ process tmhmmParallel {
 }
 tmhmmResults.collectFile(name: 'tmhmm_annotations.tsv').into{ tmhmmResultToAnnotate ; tmhmmResultToGff3 }
 
+process tmhmmPyParallel {
+  conda tmhmmPyCondaEnvPath //Has a pretty bloated dependency tree, so env is installed independently & stored
+  publishDir "transXpress_results/tmhmm.py"
+  cpus 1
+  queue params.queue_shorttime_nodes
+  clusterOptions params.cluster_options
+  beforeScript params.before_script_cmds
+  input:
+    file chunk from tmhmmChunks_ch2
+  output:
+    file "./*.out" into tmhmmPyOutResults
+    file "./*.plot" into tmhmmPyAnnotationResults
+    file "./*.summary" into tmhmmPySummaryResults
+  tag { chunk }
+  script:
+    """
+    ##conda config --add channels dansondergaard
+
+    ##If interested in using tmhmm.py:
+    tmhmm -m \${CONDA_PREFIX}/TMHMM2.0.model -f ${chunk}
+    ##It makes 3 files, *.annotation, *.plot, *.summary
+    """
+}
+
 process tmhmmMakeGff3 {
 executor 'local'
+cpus 1
 beforeScript params.before_script_cmds
 input:
  file tmhmmResultToGff3
@@ -935,6 +972,7 @@ transdecoderGFF3ToLiftover.combine(combinedGff3s.collectFile(name: 'collected.gf
 
 process liftoverPeptideGff3ToTranscript {
 executor 'local'
+cpus 1
 beforeScript params.before_script_cmds
 input:
  set file(transdecoderGFF3ToLiftover), file(gff3FilesToLiftover) from liftOverGffsTuple
@@ -1010,6 +1048,7 @@ liftoverResults.collectFile(name: 'liftover_results.gff3').set{ liftoverResult  
 // Collect parallelized annotations
 process annotatedFasta {
   executor 'local'
+  cpus 1
   publishDir "transXpress_results", mode: "copy"
   beforeScript params.before_script_cmds
   input:
@@ -1155,6 +1194,7 @@ transcriptome_annotated_pep_ch.into { transcriptome_annotated_pep_ch1 ; transcri
 
 process final_checksum {
     executor 'local'
+    cpus 1
     publishDir "transXpress_results", mode: "copy"
     beforeScript params.before_script_cmds
     input:
