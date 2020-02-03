@@ -210,6 +210,7 @@ relativeSamples_ch.into{ samples_file_toTrinity; relativeSamples_toTrinityFinish
 process trimmomatic {
 cpus params.general_CPUs
 queue params.queue_standard_nodes
+time params.queue_stdtime
 clusterOptions params.cluster_options
 beforeScript params.before_script_cmds
 input:
@@ -243,6 +244,7 @@ process fastqc {
 publishDir "transXpress_results/fastqc_results/", mode: "copy"
 cpus params.general_CPUs
 queue params.queue_standard_nodes
+time params.queue_stdtime
 clusterOptions params.cluster_options
 beforeScript params.before_script_cmds
 input:
@@ -343,6 +345,7 @@ process trinityInchwormChrysalis {
   cpus params.assembly_CPUs
   memory params.assembly_MEM+" GB"
   queue params.queue_highmemory_nodes
+  time params.queue_longtime
   clusterOptions params.cluster_options
   beforeScript params.before_script_cmds
   tag { dateMetadataPrefix+"Trinity" }
@@ -396,6 +399,7 @@ process trinityButterflyParallel {
   maxForks params.max_forks
   cpus params.general_CPUs
   queue params.queue_standard_nodes
+  time params.queue_stdtime
   clusterOptions params.cluster_options
   beforeScript params.before_script_cmds
   input:
@@ -477,6 +481,7 @@ process runSPAdes {
 cpus params.assembly_CPUs
 memory params.assembly_MEM+" GB"
 queue params.queue_highmemory_nodes
+time params.queue_longtime
 clusterOptions params.cluster_options
 beforeScript params.before_script_cmds
 input:
@@ -523,6 +528,7 @@ process renameAssembly {
 process transdecoderLongOrfs {
   publishDir "transXpress_results", mode: "copy"
   queue params.queue_standard_nodes
+  time params.queue_stdtime
   clusterOptions params.cluster_options
   cpus 1
   memory "5 GB"
@@ -547,6 +553,7 @@ process kallisto {
   publishDir "transXpress_results", mode: "copy"
   cpus params.general_CPUs
   queue params.queue_standard_nodes
+  time params.queue_stdtime
   clusterOptions params.cluster_options
   beforeScript params.before_script_cmds
   input:
@@ -611,7 +618,8 @@ longOrfsProteomeSplit
 process sprotBlastxParallel {
   maxForks params.max_forks
   cpus params.general_CPUs
-  queue params.queue_shorttime_nodes
+  queue { task.attempt > 1 ? params.queue_standard_nodes : params.queue_shorttime_nodes }
+  time { task.attempt > 1 ? params.queue_stdtime : params.queue_shorttime }
   clusterOptions params.cluster_options
   beforeScript params.before_script_cmds
   input:
@@ -631,7 +639,8 @@ process sprotBlastxParallel {
 process sprotBlastpParallel {
   maxForks params.max_forks
   cpus params.general_CPUs
-  queue params.queue_shorttime_nodes
+  queue { task.attempt > 1 ? params.queue_standard_nodes : params.queue_shorttime_nodes }
+  time { task.attempt > 1 ? params.queue_stdtime : params.queue_shorttime }
   clusterOptions params.cluster_options
   beforeScript params.before_script_cmds
   input:
@@ -653,7 +662,8 @@ sprotBlastpResults.collectFile(name: 'blastp_annotations.tsv').into { blastpForT
 process pfamParallel {
   maxForks params.max_forks
   cpus params.general_CPUs
-  queue params.queue_shorttime_nodes
+  queue { task.attempt > 1 ? params.queue_standard_nodes : params.queue_shorttime_nodes }
+  time { task.attempt > 1 ? params.queue_stdtime : params.queue_shorttime }
   clusterOptions params.cluster_options
   beforeScript params.before_script_cmds
   input:
@@ -677,7 +687,8 @@ pfamDomResults.collectFile(name: 'pfam_dom_annotations.txt').into { pfamDomResul
 process rfamParallel {
   maxForks params.max_forks
   cpus params.general_CPUs
-  queue params.queue_shorttime_nodes
+  queue { task.attempt > 1 ? params.queue_standard_nodes : params.queue_shorttime_nodes }
+  time { task.attempt > 1 ? params.queue_stdtime : params.queue_shorttime }
   clusterOptions params.cluster_options
   beforeScript params.before_script_cmds
   input:
@@ -716,6 +727,7 @@ process transdecoderPredict {
   publishDir "transXpress_results", mode: "copy" // , saveAs: { filename -> "transcriptome_after_predict.pep" }
   cpus 1
   queue params.queue_standard_nodes
+  time { task.attempt > 1 ? params.queue_stdtime : params.queue_shorttime }
   clusterOptions params.cluster_options
   beforeScript params.before_script_cmds
   input:
@@ -804,7 +816,9 @@ touch pfam_domains.gff3
 
 process signalp4Parallel {
   cpus 1
-  queue params.queue_shorttime_nodes
+  maxForks params.max_forks
+  queue { task.attempt > 1 ? params.queue_standard_nodes : params.queue_shorttime_nodes }
+  time { task.attempt > 1 ? params.queue_stdtime : params.queue_shorttime }
   clusterOptions params.cluster_options
   beforeScript params.before_script_cmds
   input:
@@ -825,7 +839,9 @@ process signalp4Parallel {
 
 process signalp5Parallel {
   cpus 1
-  queue params.queue_shorttime_nodes
+  maxForks params.max_forks
+  queue { task.attempt > 1 ? params.queue_standard_nodes : params.queue_shorttime_nodes }
+  time { task.attempt > 1 ? params.queue_stdtime : params.queue_shorttime }
   clusterOptions params.cluster_options
   beforeScript params.before_script_cmds
   input:
@@ -852,7 +868,9 @@ signalp5ResultsGff3.collectFile(name: 'signalp5_annotations.gff3').into{ signalp
 
 
 process deeplocParallel {
-  queue params.queue_shorttime_nodes
+  maxForks params.max_forks
+  queue { task.attempt > 1 ? params.queue_standard_nodes : params.queue_shorttime_nodes }
+  time { task.attempt > 1 ? params.queue_stdtime : params.queue_shorttime }
   cpus 1
   clusterOptions params.cluster_options
   beforeScript params.before_script_cmds
@@ -880,7 +898,9 @@ tmhmmChunks.into{tmhmmChunks_ch1; tmhmmChunks_ch2}
 //TODO: Update this to tmhmm.py, which is on conda?
 process tmhmmParallel {
   cpus 1
-  queue params.queue_shorttime_nodes
+  maxForks params.max_forks
+  queue { task.attempt > 1 ? params.queue_standard_nodes : params.queue_shorttime_nodes }
+  time { task.attempt > 1 ? params.queue_stdtime : params.queue_shorttime }
   clusterOptions params.cluster_options
   beforeScript params.before_script_cmds
   input:
@@ -907,10 +927,12 @@ process tmhmmParallel {
 tmhmmResults.collectFile(name: 'tmhmm_annotations.tsv').into{ tmhmmResultToAnnotate ; tmhmmResultToGff3 }
 
 process tmhmmPyParallel {
-  conda tmhmmPyCondaEnvPath //Has a pretty bloated dependency tree, so env is installed independently & stored
+  conda params.tmhmmPyCondaEnvPath //Has a pretty bloated dependency tree, so env is installed independently & stored
   publishDir "transXpress_results/tmhmm.py"
+  maxForks params.max_forks
   cpus 1
-  queue params.queue_shorttime_nodes
+  queue { task.attempt > 1 ? params.queue_standard_nodes : params.queue_shorttime_nodes }
+  time { task.attempt > 1 ? params.queue_stdtime : params.queue_shorttime }
   clusterOptions params.cluster_options
   beforeScript params.before_script_cmds
   input:
