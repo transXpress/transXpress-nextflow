@@ -85,19 +85,19 @@ log.info """
  * Step 0 Download reference databases
  */
 
-process downloadEggNOG {
-  executor 'local'
-  cpus 1
-  storeDir params.storeDB
-  beforeScript params.before_script_cmds
-  output:
-    file "NOG.annotations.tsv" into eggNOGDb
-  script:
-    """
-    wget "http://eggnogdb.embl.de/download/latest/data/NOG/NOG.annotations.tsv.gz"
-    gunzip NOG.annotations.tsv.gz
-    """
-}
+//process downloadEggNOG {
+//  executor 'local'
+//  cpus 1
+//  storeDir params.storeDB
+//  beforeScript params.before_script_cmds
+//  output:
+//    file "NOG.annotations.tsv" into eggNOGDb
+//  script:
+//    """
+//    wget "http://eggnogdb.embl.de/download/latest/data/NOG/NOG.annotations.tsv.gz"
+//    gunzip NOG.annotations.tsv.gz
+//    """
+//}
 
 process downloadRfam {
   executor 'local'
