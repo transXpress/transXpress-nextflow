@@ -206,6 +206,15 @@ output_handle.close()
 }
 relativeSamples_ch.into{ samples_file_toTrinity; relativeSamples_toTrinityFinish; relativeSamples_toKallisto; samples_file_toYAMLConvert}
 
+process prepareTrimmomaticAdapters {
+
+output:
+ path "adapters.fa" into trimmomaticAdapters
+shell:
+'''
+seqkit seq -w 0 ${CONDA_PREFIX}/share/trimmomatic-0.39-1/adapters/*.fa > adapters.fa
+'''
+}
 
 process trimmomatic {
 cpus params.general_CPUs
@@ -215,7 +224,7 @@ clusterOptions params.cluster_options
 beforeScript params.before_script_cmds
 input:
  set file(R1_reads),file(R2_reads) from trimReadPairs_ch
- file "adapters.fasta" from file(params.trimmomatic_adapter_file)
+ file "adapters.fasta" from trimmomaticAdapters
 tag {"$R1_reads"+" and " +"$R2_reads"}
 output:
   set file("${R1_reads}.R1-P.qtrim.fastq.gz"), file("${R2_reads}.R2-P.qtrim.fastq.gz") into filteredPairedReads_toChoice,filteredPairedReads_toKallisto
