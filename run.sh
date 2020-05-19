@@ -34,7 +34,7 @@ echo "Future versions of transXpress will be more intelligent about dependency h
 ASSEMBLER=$1
 
 export NXF_ANSI_LOG='false'
-GIT_DIR=$(dirname $(readlink -f ./transXpress.nf))"/.git"
+GIT_DIR=$(dirname $(readlink -f ./main.nf))"/.git"
 GIT_HASH=$(git --git-dir=${GIT_DIR} log --pretty=format:'%H' -n 1)
 OUTFILE="transXpress-$ASSEMBLER.stdout.log"
 ERRFILE="transXpress-$ASSEMBLER.stderr.log"
@@ -45,7 +45,7 @@ echo "Logs are being written to $OUTFILE and $ERRFILE in the current directory" 
 echo "Try 'lsof $OUTFILE' if you need to get the process id of the nextflow manager" | tee -a $OUTFILE
 echo "'tail -f $OUTFILE' will let you see the output of nextflow in real time" | tee -a $OUTFILE 
 echo "transXpress-nextflow dropping to background on host "$HOSTNAME"..." | tee -a $OUTFILE
-nextflow run transXpress.nf -w work-$ASSEMBLER -profile $THEPROFILE --assembler $ASSEMBLER --samples 'samples.tsv' --prefix_add_metadata_file 'prefix.txt' -resume 1>>$OUTFILE 2>$ERRFILE &
+nextflow run main.nf -w work-$ASSEMBLER -profile $THEPROFILE --assembler $ASSEMBLER --samples 'samples.tsv' --prefix_add_metadata_file 'prefix.txt' -resume 1>>$OUTFILE 2>$ERRFILE &
 disown
 
 
