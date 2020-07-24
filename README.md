@@ -76,25 +76,28 @@ Symbolically link the transxpress-nextflow code into your assembly directory
 ```
 ln -s /your/transxpress-nextflow-cloned-directory/* ./
 ```
-Make sure your conda `transxpress` environment has been sourced, and then execute the run.sh script with your assembler of choice, either `trinity` or `rnaspades` currently
+Make sure your conda `transxpress` environment has been sourced, and then execute the run.sh script with your assembler and profile of choice. You can choose your execution/cluster platform by setting the `--executor` parameter, e.g. `local` or `pbs`
+Note: For the cluster, depending on how strict your cluster is, you may need to tweak `cluster.config` quite a bit.
 ```
-./run.sh trinity
+nextflow run main.nf -w work-$ASSEMBLER -profile $THEPROFILE --assembler $ASSEMBLER --samples 'samples.tsv' --prefix_add_metadata_file 'prefix.txt' -resume
 ```
 NextFlow only likes 1 assembly per directory, so if you'd like to run two assemblies simultaneously, you have to use different assembly directories.
+
+## Assemblers
+
+Currently 'trinity' or 'rnaspades'
 
 ## Profiles
 The 2nd parameter for the ./run.sh wrapper script allows you to specify the profile that is used. The profiles (stored in the `nextflow.config` file) are currently used to configure the execution mode (cluster vs local), and if the assembly is strand specific or not.
 ```
-./run.sh trinity strandSpecific_local
+./run.sh trinity strandSpecific
 ```
 Available profiles are as follows:
 ```
-notStrandSpecific_local
-strandSpecific_local
-notStrandSpecific_LSF
-strandSpecific_LSF
-test_notStrandSpecific_local
-test_strandSpecific_local
+strandSpecific
+notStrandSpecific
+test_notStrandSpecific
+test_strandSpecific
 ```
 ## Running tests
 ```
