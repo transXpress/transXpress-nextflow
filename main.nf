@@ -928,6 +928,7 @@ process tmhmmParallel {
     if hash tmhmm 2>/dev/null;
     then
     echo tmhmm ${chunk}
+    ##Have to be careful as dtu.dk tmhmm and tmhmm.py have a name collision. 
     tmhmm --short < ${chunk} > tmhmm_out
     else
     echo "Unable to find tmhmm, so making dummy files instead"
@@ -939,7 +940,7 @@ tmhmmResults.collectFile(name: 'tmhmm_annotations.tsv').into{ tmhmmResultToAnnot
 
 //Comment out, rather than deal with this.
 //process tmhmmPyParallel {
-//  conda params.tmhmmPyCondaEnvPath //Has a pretty bloated dependency tree, so env is installed independently & stored
+//  //Recommend installing with pip, rather with Conda.  
 //  publishDir "transXpress_results/tmhmm.py"
 //  maxForks params.max_forks
 //  cpus 1
