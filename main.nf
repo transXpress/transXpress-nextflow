@@ -448,7 +448,7 @@ process trinityButterflyParallel {
 
 
 process trinityFinish {
-   cache "deep"
+   cache "lenient"
    executor "local"
    publishDir "transXpress_results", mode: "copy", saveAs: { filename -> filename.replaceAll("trinity_out_dir/Trinity", "transcriptome") }
    beforeScript params.before_script_cmds
@@ -477,6 +477,7 @@ process trinityFinish {
      ##Link the files into a directory structure that Trinity can deal with correctly, even if it isn't 100% right
      ln -s "../../../../\$f" "trinity_out_dir/read_partitions/Fb_0/CBin_0/."
     done < fasta_files.txt
+
     ##Have to produce these files to trick Trinity into thinking things are done
     cp ${trinityCmdsCollected} trinity_out_dir/recursive_trinity.cmds
     cp ${finishedCommands} trinity_out_dir/recursive_trinity.cmds.completed
@@ -592,27 +593,28 @@ normalizedKallistoTable
     .first()
     .into { transcriptExpression; expressionStats }
 
-process trinityStats {
-  executor 'local'
-  publishDir "transXpress_results", mode: "copy"
-  cpus 1
-  beforeScript params.before_script_cmds
-  input:
-    set val(assemblerStats), file(transcriptomeStats) from transcriptomeToStats
-    file expressionStats
-  output:
-    file "transcriptome_stats.txt"
-    file "transcriptome_exN50.plot.pdf"
-  tag { dateMetadataPrefix+"${assemblerStats}" }
-  script:
-    """
-    export TRINITY_HOME=\$(dirname \$(readlink -f \$(which Trinity)))
-    echo TRINITY_HOME set to \${TRINITY_HOME}
-    \${TRINITY_HOME}/util/TrinityStats.pl ${transcriptomeStats} > transcriptome_stats.txt
-    \${TRINITY_HOME}/util/misc/contig_ExN50_statistic.pl ${expressionStats} ${transcriptomeStats} > transcriptome_exN50
-    \${TRINITY_HOME}/util/misc/plot_ExN50_statistic.Rscript transcriptome_exN50
-    """
-}
+//Not working, PDF naming issue. Easier to comment out than fix.
+//process trinityStats {
+//  executor 'local'
+//  publishDir "transXpress_results", mode: "copy"
+//  cpus 1
+//  beforeScript params.before_script_cmds
+//  input:
+//    set val(assemblerStats), file(transcriptomeStats) from transcriptomeToStats
+//    file expressionStats
+//  output:
+//    file "transcriptome_stats.txt"
+//    file "transcriptome_exN50.plot.pdf"
+//  tag { dateMetadataPrefix+"${assemblerStats}" }
+//  script:
+//    """
+//    export TRINITY_HOME=\$(dirname \$(readlink -f \$(which Trinity)))
+//    echo TRINITY_HOME set to \${TRINITY_HOME}
+//    \${TRINITY_HOME}/util/TrinityStats.pl ${transcriptomeStats} > transcriptome_stats.txt
+//    \${TRINITY_HOME}/util/misc/contig_ExN50_statistic.pl ${expressionStats} ${transcriptomeStats} > transcriptome_exN50
+//    \${TRINITY_HOME}/util/misc/plot_ExN50_statistic.Rscript transcriptome_exN50
+//    """
+//}
 
 
 transcriptomeToSplit
@@ -935,31 +937,32 @@ process tmhmmParallel {
 }
 tmhmmResults.collectFile(name: 'tmhmm_annotations.tsv').into{ tmhmmResultToAnnotate ; tmhmmResultToGff3 }
 
-process tmhmmPyParallel {
-  conda params.tmhmmPyCondaEnvPath //Has a pretty bloated dependency tree, so env is installed independently & stored
-  publishDir "transXpress_results/tmhmm.py"
-  maxForks params.max_forks
-  cpus 1
-  queue { task.attempt > 1 ? params.queue_standard_nodes : params.queue_shorttime_nodes }
-  time { task.attempt > 1 ? params.queue_stdtime : params.queue_shorttime }
-  clusterOptions params.cluster_options
-  beforeScript params.before_script_cmds
-  input:
-    file chunk from tmhmmChunks_ch2
-  output:
-    file "./*.out" into tmhmmPyOutResults
-    file "./*.plot" into tmhmmPyAnnotationResults
-    file "./*.summary" into tmhmmPySummaryResults
-  tag { chunk }
-  script:
-    """
-    ##conda config --add channels dansondergaard
-
-    ##If interested in using tmhmm.py:
-    tmhmm -m \${CONDA_PREFIX}/TMHMM2.0.model -f ${chunk}
-    ##It makes 3 files, *.annotation, *.plot, *.summary
-    """
-}
+//Comment out, rather than deal with this.
+//process tmhmmPyParallel {
+//  conda params.tmhmmPyCondaEnvPath //Has a pretty bloated dependency tree, so env is installed independently & stored
+//  publishDir "transXpress_results/tmhmm.py"
+//  maxForks params.max_forks
+//  cpus 1
+//  queue { task.attempt > 1 ? params.queue_standard_nodes : params.queue_shorttime_nodes }
+//  time { task.attempt > 1 ? params.queue_stdtime : params.queue_shorttime }
+//  clusterOptions params.cluster_options
+//  beforeScript params.before_script_cmds
+//  input:
+//    file chunk from tmhmmChunks_ch2
+//  output:
+//    file "./*.out" into tmhmmPyOutResults
+//    file "./*.plot" into tmhmmPyAnnotationResults
+//    file "./*.summary" into tmhmmPySummaryResults
+//  tag { chunk }
+//  script:
+//    """
+//    ##conda config --add channels dansondergaard
+//
+//    ##If interested in using tmhmm.py:
+//    tmhmm -m \${CONDA_PREFIX}/TMHMM2.0.model -f ${chunk}
+//    ##It makes 3 files, *.annotation, *.plot, *.summary
+//    """
+//}
 
 process tmhmmMakeGff3 {
 executor 'local'

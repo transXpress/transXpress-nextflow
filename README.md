@@ -8,7 +8,7 @@ Also see our sister project: [transXpress-snakemake](https://github.com/transXpr
 ## Dependencies
 
 Requires
-* NextFlow 19.01.0+ (install via conda)
+* NextFlow 20.04.0+ (install via conda)
 * fastqc (install via conda)
 * trimmomatic (install via conda)
 * Trinity (install via conda)
@@ -41,8 +41,9 @@ conda activate transxpress
 ~~~
  conda config --add channels bioconda
  conda config --add channels conda-forge
+ conda config --add channels r
  conda config --set channel_priority false
- conda install nextflow fastqc trimmomatic "trinity>=2.9.1" "spades>=3.14" transdecoder biopython samtools bowtie2 infernal hmmer kallisto blast r seqkit bioconductor-edger parallel graphviz
+ conda install nextflow fastqc trimmomatic "trinity>=2.9.1" "spades>=3.14" transdecoder biopython samtools bowtie2 infernal hmmer kallisto blast r r-tidyverse seqkit bioconductor-edger parallel graphviz
 ~~~
 (Note, below dependencies are optional, transXpress will run to completion without them, but will produce empty files for their output)
 
