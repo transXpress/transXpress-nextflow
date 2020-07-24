@@ -1,0 +1,22 @@
+name: transxpress
+channels:
+  - bioconda
+  - conda-forge
+  - r
+  - defaults
+dependencies:
+  - trinity>=2.9.1
+  - spades>=3.14
+  - transdecoder
+  - biopython
+  - samtools
+  - bowtie2
+  - infernal
+  - hmmer
+  - kallisto
+  - blast
+  - r
+  - seqkit
+  - bioconductor-edger
+  - parallel
+  - graphviz
