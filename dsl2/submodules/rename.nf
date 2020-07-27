@@ -1,3 +1,5 @@
+nextflow.enable.dsl=2
+
 process renameAssembly {
    executor 'local'
    storeDir "transXpress_results"

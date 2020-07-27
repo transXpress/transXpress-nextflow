@@ -1,3 +1,5 @@
+nextflow.enable.dsl=2
+
 process fastqc {
     tag "FASTQC on $sample_id"
     input:
