@@ -2,16 +2,16 @@ nextflow.enable.dsl=2
 
 //params.reads = "$baseDir/raw_data/reads/*_{1,2}.fq*"
 
-include downloadTransxpressDbs as downloadDbs from './submodules/databases.nf'
-include parseSamplesTSV from './submodules/sample_parsing.nf'
-include trim from './submodules/trimmomatic.nf'
+include { downloadTransxpressDbs as downloadDbs } from './submodules/databases.nf'
+include { parseSamplesTSV } from './submodules/sample_parsing.nf'
+include { trim } from './submodules/trimmomatic.nf'
 
-include rnaSPAdes from './submodules/rnaspades.nf' 
-include fullTrinity from './submodules/trinity.nf'
-include renameAssembly from './submodules/rename.nf'
+include { rnaSPAdes } from './submodules/rnaspades.nf' 
+include { fullTrinity } from './submodules/trinity.nf'
+include { renameAssembly } from './submodules/rename.nf'
 
-include transdecoderFull from './submodules/transdecoder.nf'
-include transdecoderLongOrfs from './submodules/transdecoder.nf'
+include { transdecoderFull } from './submodules/transdecoder.nf'
+include { transdecoderLongOrfs } from './submodules/transdecoder.nf'
 
 
 workflow {

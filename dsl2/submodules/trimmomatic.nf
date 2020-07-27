@@ -28,7 +28,7 @@ input:
  file "adapters.fasta"
 tag {"$R1_reads"+" and " +"$R2_reads"}
 output:
-  set file("${R1_reads}.R1-P.qtrim.fastq.gz"), file("${R2_reads}.R2-P.qtrim.fastq.gz") //filteredPairedReads
+  tuple file("${R1_reads}.R1-P.qtrim.fastq.gz"), file("${R2_reads}.R2-P.qtrim.fastq.gz") //filteredPairedReads
   //file "*U.qtrim.fastq.gz" // filteredSingleReads
 script:
 """

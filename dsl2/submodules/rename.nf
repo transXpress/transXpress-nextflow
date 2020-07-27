@@ -7,7 +7,7 @@ process renameAssembly {
     tuple val(assembler), path(geneTransMap), path(transcriptome_fasta)
     val dateMetadataPrefix
    output:
-    tuple assembler, path("${assembler}_renamed.fasta.gene_trans_map"), path("${dateMetadataPrefix}${assembler}.transcripts.fasta")
+    tuple val(assembler), path("${assembler}_renamed.fasta.gene_trans_map"), path("${dateMetadataPrefix}${assembler}.transcripts.fasta")
    tag { dateMetadataPrefix+"${assembler}" }
    script:
    """
