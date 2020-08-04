@@ -43,17 +43,18 @@ publishDir "results", mode:'link',overwrite:'true'
   path reference_fasta
   path bam_files
  output:
-  path "all.vcf.gz"
+  tuple path("all.vcf.gz"),path("all2.vcf.gz.tbi")
 script:
 """
-freebayes --max-complex-gap 75 --min-coverage 3 --fasta-reference ${reference_fasta} -p 6 ${bam_files} | gzip > all.vcf.gz
+freebayes --max-complex-gap 75 --min-coverage 3 --fasta-reference ${reference_fasta} -p 6 ${bam_files} | bgzip > all.vcf.gz
+tabix all.vcf.gz
 """
 }
 
 process bcf_conv {
 publishDir "results", mode:'link',overwrite:'true'
  input:
-  path vcf
+  tuple path(vcf),path(vcf_index)
  output:
   path "all.bcf"
 script:
