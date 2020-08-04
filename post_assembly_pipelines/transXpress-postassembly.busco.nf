@@ -1,42 +1,29 @@
+nextflow.enable.dsl=2
+params.peptides = ""
+params.transcripts = ""
 
-
-Channel.from("bacteria_odb9",\
-"fungi_odb9",\
-"metazoa_odb9",\
-"eukaryota_odb9").set{ BUSCO_lineages }
-
-Channel.fromPath(params.peptides).set{peptides_ch}
-Channel.fromPath(params.transcripts).set{transcripts_ch)
-
-process downloadBUSCOProfile {
-storeDir params.storeDB
+process downloadBUSCOLineage {
 input:
- val lineage from BUSCO_lineages
+ val lineage
 output:
- file "${lineage}" into BUSCO_profiles
+ file "*"
 
 script:
 """
-wget https://busco.ezlab.org/datasets/${lineage}.tar.gz
+wget https://busco-data.ezlab.org/v4/data/lineages/${lineage}.tar.gz
 tar -xvf ${lineage}.tar.gz
+rm -f ${lineage}.tar.gz
 """
 }
 
-BUSCO_profiles.into { BUSCO_lineages_ch1 ; BUSCO_lineages_ch2 }
-
-BUSCO_cmds_pep = BUSCO_lineages_ch1.combine(peptides_ch)
-BUSCO_cmds_trans = BUSCO_lineages_ch2.combine(transcripts_ch)
-
-BUSCO_cmds_mixed = BUSCO_cmds_pep.mix(BUSCO_cmds_trans)
-
 process do_BUSCO {
- conda "busco"
- publishDir "transXpress_results", mode: "copy"
+ conda 'busco>=4.1'
+ publishDir "results/busco", mode: "link"
  cpus 6
  input:
-     set file(BUSCO_lineage), file(inputFasta) from BUSCO_cmds_mixed
+     tuple path(BUSCO_lineage), path(inputFasta)
  output:
-     file 'run_'+assemblyPrefix+'*/*'
+     path 'run_*/*'
  tag { inputFasta+"_"+BUSCO_lineage }
  """
  NAME=\$(basename ${inputFasta})
@@ -48,7 +35,21 @@ process do_BUSCO {
   TYPE=transcriptome
  fi
 
- run_BUSCO.py -z -t /mnt/ramdisk -f -i ${inputFasta} -l ${BUSCO_lineage} -o \${NAME}_\${LINEAGE_NAME} -m \$TYPE --cpu ${task.cpus}
- """
- 
+ run_busco -z -f -i ${inputFasta} -l ${BUSCO_lineage} -o \${NAME}_\${LINEAGE_NAME} -m \$TYPE --cpu ${task.cpus}
+ """ 
+}
+
+workflow {
+
+Channel.from("eukaryota_odb10.2019-11-20").set{ BUSCO_lineages }
+
+//peptides_ch = Channel.fromPath(params.peptides)
+transcripts_ch = Channel.fromPath(params.transcripts)
+
+downloadBUSCOLineage(BUSCO_lineages)
+
+mixed = downloadBUSCOLineage.out.combine(transcripts_ch)
+
+do_BUSCO(mixed)
+
 }
